@@ -88,6 +88,7 @@
         jour.setHours(9, 30, 0, 0);
         return Object.assign({
           titre: 'Nettoyage de la grève de Kerhuon', lieu: 'Plage du Passage', commune: 'Le Relecq-Kerhuon',
+          lat: 48.40401, lng: -4.39502,
           date_debut: jour.toISOString(), duree_min: 90, places: 12,
           materiel_a_apporter: ' bottes , une gourde,,', materiel_fourni: 'sacs poubelle; pinces'
         }, modifs || {});
@@ -105,6 +106,10 @@
       var apres = await db.listerSortiesAVenir();
       var rangee = apres.every(function (s, i) { return i === 0 || new Date(apres[i - 1].date_debut) <= new Date(s.date_debut); });
       noter('US2 – la nouvelle sortie apparaît dans la liste, à sa date', apres.length === 5 && rangee && apres.some(function (s) { return s.id === creee.id; }));
+      noter('US6 – la nouvelle sortie garde son point de rendez-vous', creee.lat === 48.40401 && creee.lng === -4.39502);
+      noter('US6 – toutes les sorties à venir de la démo ont un point sur la carte', apres.every(function (s) { return typeof s.lat === 'number' && typeof s.lng === 'number'; }));
+      await doitEchouer('US6 – sortie sans point de rendez-vous refusée', db.creerSortie(nouvelleSortie({ lat: null, lng: null })), 'point de rendez-vous');
+      await doitEchouer('US6 – point loin de la rade de Brest refusé', db.creerSortie(nouvelleSortie({ lat: 48.8566, lng: 2.3522 })), 'rade de Brest');
       await doitEchouer('US2 – titre vide refusé', db.creerSortie(nouvelleSortie({ titre: '  ' })), 'titre');
       await doitEchouer('US2 – date manquante refusée', db.creerSortie(nouvelleSortie({ date_debut: null })), 'date');
       await doitEchouer('US2 – date passée refusée', db.creerSortie(nouvelleSortie({ date_debut: new Date(Date.now() - 3600000).toISOString() })), 'futur');

@@ -119,6 +119,13 @@
         saisir('Places', '12');
         saisir('Ce que les bénévoles apportent', 'bottes, une gourde');
         saisir("Ce que l'asso apporte", 'sacs poubelle, pinces');
+        noter('US6 – le formulaire contient une carte pour placer le rendez-vous', !!doc.querySelector('main .leaflet-container'));
+        bouton('Publier la sortie').click();
+        await attendreQue(function () { return !!doc.querySelector('[role=alert]') && doc.querySelector('[role=alert]').textContent.indexOf('point de rendez-vous') !== -1; });
+        noter('US6 – sans point sur la carte : message d\'erreur', !!doc.querySelector('[role=alert]') && doc.querySelector('[role=alert]').textContent.indexOf('point de rendez-vous') !== -1);
+        bouton('Placer au centre de la carte').click();
+        await attendreQue(function () { return !!doc.querySelector('main .leaflet-marker-icon'); });
+        noter('US6 – le point de rendez-vous est placé sur la carte', !!doc.querySelector('main .leaflet-marker-icon') && texte().indexOf('Point placé') !== -1);
         bouton('Publier la sortie').click();
         await attendreQue(function () { return !!doc.querySelector('main h1') && doc.querySelector('main h1').textContent === 'Nettoyage de la grève de Kerhuon'; });
         noter('US2 – la sortie est publiée et sa fiche s\'ouvre', !!doc.querySelector('main h1') && doc.querySelector('main h1').textContent === 'Nettoyage de la grève de Kerhuon');
@@ -152,10 +159,28 @@
         bouton('Toutes les sorties').click();
         await attendreQue(function () { return doc.querySelectorAll('main li').length === 5; });
 
-        // Onglets : seul "Sorties" a du contenu pour l'instant
+        // Onglets
         var libelles = Array.from(doc.querySelectorAll('nav button')).map(function (b) { return b.textContent.trim(); });
         noter('Onglets – Sorties, Carte, Signaler, Profil présents', libelles.join(',') === 'Sorties,Carte,Signaler,Profil');
-        var titres = { Carte: 'Carte', Signaler: 'Signaler un endroit pollué', Profil: 'Mon profil' };
+
+        // US6 : la carte des sorties
+        bouton('Carte').click();
+        await attendreQue(function () { return doc.querySelectorAll('main .leaflet-marker-icon').length === 5; });
+        noter('US6 – l\'onglet Carte s\'ouvre avec son titre', !!doc.querySelector('main h1') && doc.querySelector('main h1').textContent === 'Carte des sorties');
+        noter('US6 – un point par sortie à venir (5)', doc.querySelectorAll('main .leaflet-marker-icon').length === 5, doc.querySelectorAll('main .leaflet-marker-icon').length + ' point(s)');
+        noter('US6 – crédit OpenStreetMap affiché', texte().indexOf('OpenStreetMap') !== -1);
+        doc.querySelector('main .leaflet-marker-icon[title="Nettoyage de la grève de Kerhuon"]').click();
+        await attendreQue(function () { return !!doc.querySelector('.leaflet-popup-content'); });
+        var bulle = doc.querySelector('.leaflet-popup-content');
+        noter('US6 – un clic sur un point ouvre sa bulle', !!bulle && bulle.textContent.indexOf('Nettoyage de la grève de Kerhuon') !== -1 && bulle.textContent.indexOf('12 places restantes') !== -1);
+        bulle.querySelector('button').click();
+        await attendreQue(function () { return !!doc.querySelector('main h1') && doc.querySelector('main h1').textContent === 'Nettoyage de la grève de Kerhuon'; });
+        noter('US6 – « Voir la sortie » ouvre la fiche', !!doc.querySelector('main h1') && doc.querySelector('main h1').textContent === 'Nettoyage de la grève de Kerhuon');
+        bouton('Retour à la carte').click();
+        await attendreQue(function () { return doc.querySelectorAll('main .leaflet-marker-icon').length === 5; });
+        noter('US6 – « Retour à la carte » ramène sur la carte', doc.querySelectorAll('main .leaflet-marker-icon').length === 5);
+
+        var titres = { Signaler: 'Signaler un endroit pollué', Profil: 'Mon profil' };
         for (var nom in titres) {
           bouton(nom).click();
           await attendreQue(function () { return !!doc.querySelector('main h1') && doc.querySelector('main h1').textContent === titres[nom]; });

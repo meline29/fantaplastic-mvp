@@ -9,8 +9,8 @@ Application web (PWA) pour les bénévoles ramasseurs de la rade de Brest.
 - **Deux modes :** si `js/config.js` contient l'URL et la clé Supabase, l'appli utilise la vraie base. Sinon, ou si on ajoute `?mode=local` à l'adresse, elle tourne en **démo locale** (données dans le navigateur, bascule « Démo · rôle » et remise à zéro disponibles).
 
 Les tests s'ouvrent de la même façon (ils tournent toujours sur la démo locale) :
-- `tests/index.html` : 49 tests de la couche de données (comptes, rôles, liste et fiche des sorties, création d'une sortie, matériel de sécurité, inscription) ;
-- `tests/ui.html` : rejoue le parcours dans l'appli, en 38 étapes (sorties, fiche d'une sortie, création de compte organisateur, création d'une sortie, bascule de rôle, formulaire de sécurité et inscription, onglets, connexion). **Attention, il remet les données de démo à zéro.**
+- `tests/index.html` : 53 tests de la couche de données (comptes, rôles, liste et fiche des sorties, création d'une sortie avec son point de rendez-vous, matériel de sécurité, inscription) ;
+- `tests/ui.html` : rejoue le parcours dans l'appli, en 46 étapes (sorties, fiche d'une sortie, création de compte organisateur, création d'une sortie avec son point sur la carte, bascule de rôle, formulaire de sécurité et inscription, carte des sorties, onglets, connexion). **Attention, il remet les données de démo à zéro.**
 - `tests/supabase.html` : vérifie la base en ligne, en lecture seule (config remplie, script SQL exécuté, règles d'accès qui bloquent un visiteur).
 
 ## Revenir à une version précédente (git)
@@ -29,10 +29,11 @@ git switch main                # revenir à la dernière version
 |---|---|
 | `index.html` | page unique, charge React 18, htm (JSX sans compilation) et Tailwind |
 | `js/app.js` | les écrans : en-tête, accueil, liste et fiche des sorties, création d'une sortie, formulaires de compte, onglets |
+| `js/carte.js` | les cartes (Leaflet + fonds OpenStreetMap) : l'onglet « Carte » et le choix du point de rendez-vous |
 | `js/regles.js` | les règles communes : contrôles des comptes et des sorties, matériel de sécurité, engagements |
 | `js/db.js` | la couche de données en « démo locale » (stockage du navigateur) |
 | `js/db-supabase.js` | la même couche de données, branchée sur Supabase (comptes, base PostgreSQL) |
-| `js/config.js` | l'URL du projet Supabase et sa clé publique « anon » (jamais la clé « service_role ») |
+| `js/config.js` | l'URL du projet Supabase et sa clé publique « publishable » (jamais la clé secrète) |
 | `supabase/schema.sql` | tables, règles d'accès (RLS), triggers et sorties d'exemple, à exécuter une fois dans Supabase |
 | `manifest.webmanifest`, `assets/` | icônes et logo, pour installer l'appli sur un téléphone |
 
@@ -73,7 +74,11 @@ Toujours pas fait : le branchement sur Supabase (T2) et l'inscription à une sor
 
 | Élément | Points (TD1) | État |
 |---|---|---|
-| US14 – S'inscrire à une sortie | 2 | Fait en mode démo locale : bouton « Je m'inscris » sur la fiche, puis **formulaire de sécurité** obligatoire. Désinscription possible. Pas d'inscription en double ni sur une sortie complète. |
+| US14 – S'inscrire à une sortie | 2 | Fait : bouton « Je m'inscris » sur la fiche, puis **formulaire de sécurité** obligatoire. Désinscription possible. Pas d'inscription en double ni sur une sortie complète. |
+| US6 – Carte des rendez-vous | 3 | Fait : onglet **Carte** avec un point par sortie à venir (vert : places libres, jaune : 3 places ou moins, rouge : complet). Un clic sur un point ouvre une bulle, puis « Voir la sortie » ouvre la fiche. À la création, l'organisateur place le point de rendez-vous sur une petite carte (obligatoire, autour de la rade de Brest). |
+| T2 / T3 – Base de données et déploiement | 4 + 5 | Fait : base Supabase et site en ligne sur Vercel (voir plus bas). |
+
+Les sorties créées avant la carte n'ont pas de point : elles sont listées sous la carte, dans « Pas encore sur la carte ».
 
 Le **formulaire de sécurité** s'affiche au moment de l'inscription :
 - les risques auxquels le bénévole s'expose : **blessure, coupure, chute**, avec les bons réflexes ;

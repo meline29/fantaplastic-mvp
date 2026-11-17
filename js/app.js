@@ -163,7 +163,7 @@
 
     var retour = html`
       <button type="button" className="flex items-center gap-1 text-sm font-semibold text-lagon-fonce hover:underline" onClick=${props.onRetour}>
-        <span aria-hidden="true">‹</span> Toutes les sorties
+        <span aria-hidden="true">‹</span> ${props.libelleRetour || 'Toutes les sorties'}
       </button>`;
 
     if (s === undefined) {
@@ -369,6 +369,7 @@
     var _p = useState('20'), places = _p[0], setPlaces = _p[1];
     var _a = useState(''), apporter = _a[0], setApporter = _a[1];
     var _f = useState(''), fourni = _f[0], setFourni = _f[1];
+    var _pt = useState(null), point = _pt[0], setPoint = _pt[1]; // US6 : { lat, lng } du rendez-vous
     var _err = useState(''), erreur = _err[0], setErreur = _err[1];
     var _env = useState(false), envoi = _env[0], setEnvoi = _env[1];
 
@@ -380,6 +381,7 @@
         var debut = jour && heureDebut ? new Date(jour + 'T' + heureDebut) : null;
         var sortie = await db.creerSortie({
           titre: titre, lieu: lieu, commune: commune,
+          lat: point ? point.lat : null, lng: point ? point.lng : null,
           date_debut: debut && !isNaN(debut.getTime()) ? debut.toISOString() : null,
           duree_min: Number(dureeMin), places: Number(places),
           materiel_a_apporter: apporter, materiel_fourni: fourni
@@ -400,6 +402,7 @@
           <${Champ} label="Lieu de rendez-vous" value=${lieu} onChange=${setLieu} placeholder="Ex. : Parking du Moulin Blanc" />
           <${Champ} label="Commune" value=${commune} onChange=${setCommune} list="communes-rade" placeholder="Ex. : Brest" />
           <datalist id="communes-rade">${COMMUNES.map(function (c) { return html`<option key=${c} value=${c} />`; })}</datalist>
+          <${window.FantaCarte.ChoixPoint} value=${point} onChange=${setPoint} />
           <div className="grid grid-cols-2 gap-3">
             <${Champ} label="Date" type="date" value=${jour} onChange=${setJour} min=${dateLocale(new Date())} />
             <${Champ} label="Heure" type="time" value=${heureDebut} onChange=${setHeureDebut} />
@@ -528,7 +531,7 @@
 
   var ONGLETS = [
     { id: 'sorties', label: 'Sorties', titre: 'Prochaines sorties', icone: IconeSorties },
-    { id: 'carte', label: 'Carte', titre: 'Carte', icone: IconeCarte },
+    { id: 'carte', label: 'Carte', titre: 'Carte des sorties', icone: IconeCarte },
     { id: 'signaler', label: 'Signaler', titre: 'Signaler un endroit pollué', icone: IconeSignaler },
     { id: 'profil', label: 'Profil', titre: 'Mon profil', icone: IconeProfil }
   ];
@@ -692,7 +695,7 @@
       contenu = html`<${FormulaireSecurite} id=${sortieOuverte} onInscrit=${inscrit} onAnnuler=${function () { setVue('detail'); }} />`;
     } else if (vue === 'detail' || vue === 'securite') {
       contenu = html`<${DetailSortie} key=${sortieOuverte} id=${sortieOuverte} utilisateur=${utilisateur}
-        onRetour=${retourAuxSorties}
+        onRetour=${retourAuxSorties} libelleRetour=${onglet === 'carte' ? 'Retour à la carte' : 'Toutes les sorties'}
         onInscrire=${function () { setVue('securite'); window.scrollTo(0, 0); }}
         onSeConnecter=${seConnecter}
         onDesinscrit=${function () { chargerSorties(); setMessage('Tu es désinscrit·e de cette sortie.'); }} />`;
@@ -724,6 +727,8 @@
           </div>
           <${ListeSorties} sorties=${sorties} erreur=${erreurSorties} onReessayer=${chargerSorties} onOuvrir=${ouvrirSortie} />
         </div>`;
+    } else if (onglet === 'carte') {
+      contenu = html`<${window.FantaCarte.CarteSorties} sorties=${sorties} erreur=${erreurSorties} onOuvrir=${ouvrirSortie} />`;
     } else {
       var infos = ONGLETS.find(function (o) { return o.id === onglet; });
       contenu = html`<${OngletVide} titre=${infos.titre} />`;

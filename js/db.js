@@ -237,7 +237,7 @@
 
       var d = donnees();
       var s = Object.assign({ id: nouvelId() }, colonnes, {
-        lat: null, lng: null, statut: 'prevue', organisateur_id: moi.id, created_at: new Date().toISOString()
+        statut: 'prevue', organisateur_id: moi.id, created_at: new Date().toISOString()
       });
       d.sorties.push(s);
       sauver();

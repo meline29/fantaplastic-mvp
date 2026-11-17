@@ -14,6 +14,13 @@
   var ROLES_ORGANISATION = ['organisateur', 'admin'];
   // Sécurité : l'asso fournit toujours ce matériel, à chaque sortie
   var MATERIEL_SECURITE = ['Gilets jaunes', 'Trousse de premiers secours'];
+  // US6 : zone acceptée pour un point de rendez-vous (la rade de Brest et ses environs,
+  // de la presqu'île de Crozon à Landerneau)
+  var ZONE_RADE = { sud: 47.9, nord: 48.75, ouest: -5.2, est: -3.9 };
+
+  function nombreOuNaN(v) {
+    return v === null || v === undefined || v === '' ? NaN : Number(v);
+  }
 
   // Le matériel est rangé sous forme de liste : ['Sacs', 'Pinces']. On accepte aussi un texte
   // "Sacs, pinces" (saisie du formulaire, ou données enregistrées avant le sprint 2).
@@ -80,6 +87,12 @@
     if (titre.length > 80) throw new Error('Le titre doit faire 80 caractères maximum.');
     if (!lieu) throw new Error('Indique le lieu de rendez-vous.');
     if (!commune) throw new Error('Indique la commune.');
+    var lat = nombreOuNaN(champs.lat);
+    var lng = nombreOuNaN(champs.lng);
+    if (isNaN(lat) || isNaN(lng)) throw new Error('Place le point de rendez-vous sur la carte.');
+    if (lat < ZONE_RADE.sud || lat > ZONE_RADE.nord || lng < ZONE_RADE.ouest || lng > ZONE_RADE.est) {
+      throw new Error('Le point de rendez-vous doit être autour de la rade de Brest.');
+    }
     if (!debut || isNaN(debut.getTime())) throw new Error("Choisis la date et l'heure de la sortie.");
     if (debut.getTime() <= Date.now()) throw new Error('La sortie doit avoir lieu dans le futur.');
     if (!Number.isInteger(dureeMin) || dureeMin < 30 || dureeMin > 480) throw new Error('La durée doit être comprise entre 30 min et 8 h.');
@@ -90,7 +103,8 @@
     return {
       titre: titre, lieu: lieu, commune: commune,
       date_debut: debut.toISOString(), duree_min: dureeMin, places: places,
-      materiel_fourni: avecSecurite(fourni), materiel_a_apporter: apporter
+      materiel_fourni: avecSecurite(fourni), materiel_a_apporter: apporter,
+      lat: lat, lng: lng
     };
   }
 
