@@ -86,11 +86,23 @@ Une fois inscrit, la fiche rappelle de signaler tout incident à l'asso.
 
 ## Mise en ligne (GitHub + Supabase + Vercel)
 
-1. **GitHub** : le code est sur un dépôt GitHub. Chaque `git push` sur `main` met le site à jour.
+| | Où | |
+|---|---|---|
+| **Site** | https://fantaplastic-mvp.vercel.app | ouvert à tous, à tester sur téléphone |
+| **Code** | https://github.com/meline29/fantaplastic-mvp | dépôt public |
+| **Base de données et comptes** | Supabase, organisation « fantaPLASTIC », projet « fantaplastic », région West EU (Paris) | offre gratuite |
+| **Hébergement** | Vercel, projet « fantaplastic-mvp » | offre gratuite (Hobby) |
+| **Vérification** | https://fantaplastic-mvp.vercel.app/tests/supabase.html | lecture seule |
+
+Pour travailler à plusieurs : ajouter les membres de l'équipe comme collaborateurs du dépôt GitHub (Settings > Collaborators) et comme membres de l'organisation Supabase (Team > Invite). L'offre gratuite de Vercel n'a pas de membres d'équipe, mais chaque push sur `main` redéploie le site, quel que soit son auteur, car le dépôt est public.
+
+Comment ça a été mis en place (à refaire si on recrée un projet) :
+
+1. **GitHub** : le code est sur un dépôt GitHub. Chaque `git push` sur `main` met le site à jour en 30 secondes environ.
 2. **Supabase** (base de données et comptes), dans un projet hébergé en Europe :
    - SQL Editor > New query > coller `supabase/schema.sql` > Run (une seule fois) ;
    - Authentication > Sign In / Providers > Email : « Confirm email » désactivé pour le MVP (l'envoi d'emails gratuit de Supabase est limité à quelques messages par heure) ;
-   - Project Settings > API : copier la « Project URL » et la clé « anon public » dans `js/config.js`.
+   - Project Settings > API Keys : copier l'URL du projet et la clé « publishable » (`sb_publishable_…`) dans `js/config.js`. Les anciennes clés « anon » sont retirées par Supabase début 2027.
 3. **Vercel** (hébergement) : Add New > Project > importer le dépôt GitHub, Framework Preset « Other », aucune commande de build, puis Deploy. Ensuite, dans Supabase > Authentication > URL Configuration, mettre l'adresse Vercel comme « Site URL ».
 4. **Vérifier** : ouvrir `https://<adresse-vercel>/tests/supabase.html`, puis faire le parcours complet sur téléphone (compte organisateur, création d'une sortie, compte bénévole, inscription avec le formulaire de sécurité).
 

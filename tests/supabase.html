@@ -38,7 +38,7 @@
 
       var config = window.FANTA_CONFIG || {};
       var rempli = !!(config.supabaseUrl && config.supabaseAnonKey);
-      noter('js/config.js contient l\'URL et la clé anon', rempli);
+      noter('js/config.js contient l\'URL et la clé publique', rempli);
       noter('la librairie Supabase est chargée', !!(window.supabase && window.supabase.createClient));
       if (!rempli || !window.supabase) return fin();
       // La clé « service_role » donne tous les droits : elle ne doit jamais être dans le site
