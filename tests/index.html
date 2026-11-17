@@ -36,7 +36,8 @@
       }
 
       // Instance séparée pour ne pas toucher aux données de démo
-      var db = creerFantaDB({ prefixe: 'test-' + Date.now() });
+      var prefixe = 'test-' + Date.now();
+      var db = creerFantaDB({ prefixe: prefixe });
 
       // US3
       var sorties = await db.listerSortiesAVenir();
@@ -121,6 +122,24 @@
       noter('Démo – on peut repasser en bénévole', redevenu.role === 'benevole' && (await db.utilisateurCourant()).role === 'benevole');
       await doitEchouer('Démo – redevenu bénévole, on ne peut plus créer de sortie', db.creerSortie(nouvelleSortie()), 'organisateurs');
       await doitEchouer('Démo – la bascule refuse le rôle admin', db.changerRoleDemo('admin'), 'bénévole ou organisateur');
+
+      // US14 : inscription avec le formulaire de sécurité
+      var engage = { risques_acceptes: true, engagement_incidents: true };
+      await db.deconnecter();
+      await doitEchouer('US14 – il faut être connecté pour s\'inscrire', db.inscrireASortie(creee.id, engage), 'Connecte-toi');
+      await db.connecter({ email: 'lou@exemple.fr', motDePasse: 'motdepasse1' });
+      await doitEchouer('US14 – refusée sans le formulaire de sécurité', db.inscrireASortie(creee.id), 'engagements');
+      await doitEchouer('US14 – refusée si l\'engagement « incidents » n\'est pas coché', db.inscrireASortie(creee.id, { risques_acceptes: true, engagement_incidents: false }), 'engagements');
+      var inscrite = await db.inscrireASortie(creee.id, engage);
+      noter('US14 – acceptée avec les deux engagements', inscrite.je_suis_inscrit === true && inscrite.nb_inscrits === 1 && inscrite.places_restantes === 11);
+      var stockees = JSON.parse(localStorage.getItem(prefixe + '.db.v1')).inscriptions;
+      var ligne = stockees.find(function (i) { return i.sortie_id === creee.id; });
+      noter('US14 – la date de l\'engagement de sécurité est gardée', !!ligne && !isNaN(new Date(ligne.securite_acceptee_le).getTime()));
+      await doitEchouer('US14 – pas de double inscription', db.inscrireASortie(creee.id, engage), 'déjà inscrit');
+      var pleine = apres.find(function (s) { return s.places_restantes === 0; });
+      await doitEchouer('US14 – sortie complète refusée', db.inscrireASortie(pleine.id, engage), 'complète');
+      var desinscrite = await db.desinscrireDeSortie(creee.id);
+      noter('US14 – désinscription', desinscrite.je_suis_inscrit === false && desinscrite.nb_inscrits === 0);
 
       db._effacer();
       document.getElementById('resume').textContent = nbOk + ' test(s) OK, ' + nbKo + ' en échec';

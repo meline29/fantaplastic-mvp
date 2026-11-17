@@ -8,8 +8,8 @@ Application web (PWA) pour les bénévoles ramasseurs de la rade de Brest.
 - **Ou avec un petit serveur :** `python -m http.server 8000` dans ce dossier, puis ouvrir http://localhost:8000
 
 Les tests s'ouvrent de la même façon :
-- `tests/index.html` : 39 tests de la couche de données (comptes, rôles, liste et fiche des sorties, création d'une sortie) ;
-- `tests/ui.html` : rejoue le parcours dans l'appli, en 31 étapes (sorties, fiche d'une sortie, création de compte organisateur, création d'une sortie, bascule de rôle, onglets, connexion). **Attention, il remet les données de démo à zéro.**
+- `tests/index.html` : 49 tests de la couche de données (comptes, rôles, liste et fiche des sorties, création d'une sortie, matériel de sécurité, inscription) ;
+- `tests/ui.html` : rejoue le parcours dans l'appli, en 38 étapes (sorties, fiche d'une sortie, création de compte organisateur, création d'une sortie, bascule de rôle, formulaire de sécurité et inscription, onglets, connexion). **Attention, il remet les données de démo à zéro.**
 
 ## Revenir à une version précédente (git)
 
@@ -63,3 +63,18 @@ En plus :
 - La phrase grise « MVP · données de démonstration… » est de nouveau affichée en bas des écrans de connexion et d'inscription.
 
 Toujours pas fait : le branchement sur Supabase (T2) et l'inscription à une sortie (US14).
+
+## Depuis la fin du sprint 2
+
+| Élément | Points (TD1) | État |
+|---|---|---|
+| US14 – S'inscrire à une sortie | 2 | Fait en mode démo locale : bouton « Je m'inscris » sur la fiche, puis **formulaire de sécurité** obligatoire. Désinscription possible. Pas d'inscription en double ni sur une sortie complète. |
+
+Le **formulaire de sécurité** s'affiche au moment de l'inscription :
+- les risques auxquels le bénévole s'expose : **blessure, coupure, chute**, avec les bons réflexes ;
+- le matériel de sécurité fourni par l'asso ;
+- deux cases à cocher, obligatoires : avoir lu les risques, et **s'engager à remonter à l'association tout incident, physique ou moral**. La date de cet engagement est gardée avec l'inscription.
+
+Une fois inscrit, la fiche rappelle de signaler tout incident à l'asso.
+
+**Matériel de sécurité :** l'asso fournit toujours des **gilets jaunes** et une **trousse de premiers secours**. Ils sont ajoutés automatiquement en tête de « Ce que l'asso apporte » pour chaque sortie (contrainte équivalente dans `supabase/schema.sql`).

@@ -67,6 +67,7 @@
         noter('US4 – les objets à apporter par le bénévole sont indiqués', texte().indexOf('Ce que tu apportes') !== -1 && texte().indexOf('Gants de jardinage') !== -1);
         noter('US4 – les objets apportés par l\'asso sont indiqués', texte().indexOf('Ce que l\'asso apporte') !== -1 && texte().indexOf('Pinces de ramassage') !== -1);
         noter('Sécurité – l\'asso apporte gilets jaunes et trousse de premiers secours', texte().indexOf('Gilets jaunes') !== -1 && texte().indexOf('Trousse de premiers secours') !== -1);
+        noter("US14 – sans compte, la fiche propose de se connecter pour s'inscrire",!!bouton("Me connecter pour m'inscrire") && !bouton("Je m'inscris"));
         bouton('Toutes les sorties').click();
         await attendreQue(function () { return doc.querySelectorAll('main li').length === 4; });
         noter('US4 – retour à la liste des sorties', doc.querySelectorAll('main li').length === 4);
@@ -131,6 +132,25 @@
         bouton('Bénévole').click();
         await attendreQue(function () { return !bouton('Créer une sortie'); });
         noter('Démo – en bénévole, le bouton « Créer une sortie » disparaît', !bouton('Créer une sortie'));
+
+        // US14 : inscription à une sortie, avec le formulaire de sécurité
+        doc.querySelector('main li button').click();
+        await attendreQue(function () { return !!bouton("Je m'inscris"); });
+        bouton("Je m'inscris").click();
+        await attendreQue(function () { return !!doc.querySelector('input[name=incidents]'); });
+        noter('US14 – le formulaire de sécurité s\'ouvre (blessure, coupure, chute)', ['Blessure', 'Coupure', 'Chute'].every(function (m) { return texte().indexOf(m) !== -1; }));
+        noter('US14 – il rappelle les gilets jaunes et la trousse de premiers secours', texte().indexOf('Gilets jaunes') !== -1 && texte().indexOf('Trousse de premiers secours') !== -1);
+        bouton('Je confirme mon inscription').click();
+        await attendreQue(function () { return !!doc.querySelector('[role=alert]'); });
+        noter('US14 – cases non cochées : inscription refusée', !!doc.querySelector('[role=alert]') && texte().indexOf('Tu es inscrit') === -1);
+        doc.querySelector('input[name=risques]').click();
+        doc.querySelector('input[name=incidents]').click();
+        bouton('Je confirme mon inscription').click();
+        await attendreQue(function () { return texte().indexOf('Tu es inscrit') !== -1; });
+        noter('US14 – cases cochées : inscription confirmée', texte().indexOf('Tu es inscrit') !== -1 && texte().indexOf('19 inscrits sur 25 places') !== -1);
+        noter('US14 – rappel de remonter tout incident à l\'asso', texte().indexOf('signaler à l\'asso') !== -1);
+        bouton('Toutes les sorties').click();
+        await attendreQue(function () { return doc.querySelectorAll('main li').length === 5; });
 
         // Onglets : seul "Sorties" a du contenu pour l'instant
         var libelles = Array.from(doc.querySelectorAll('nav button')).map(function (b) { return b.textContent.trim(); });

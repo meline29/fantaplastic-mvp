@@ -34,6 +34,9 @@ create table public.inscriptions (
   id           uuid primary key default gen_random_uuid(),
   sortie_id    uuid not null references public.sorties (id) on delete cascade,
   benevole_id  uuid not null references public.profiles (id) on delete cascade,
+  -- US14 : date à laquelle le bénévole a accepté le formulaire de sécurité
+  -- (risques blessure / coupure / chute + engagement à remonter tout incident à l'asso)
+  securite_acceptee_le  timestamptz not null,
   created_at   timestamptz not null default now(),
   unique (sortie_id, benevole_id)
 );
@@ -94,6 +97,29 @@ group by s.id
 order by s.date_debut;
 
 grant select on public.sorties_a_venir to anon, authenticated;
+
+-- ---------- US14 : pas d'inscription sur une sortie complète, passée ou annulée ----------
+
+create or replace function public.verifier_inscription()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  s public.sorties;
+begin
+  -- "for update" : deux inscriptions en même temps ne peuvent pas prendre la dernière place
+  select * into s from public.sorties where id = new.sortie_id for update;
+  if s.id is null or s.statut = 'annulee' or s.date_debut < now() then
+    raise exception 'Cette sortie n''est plus ouverte aux inscriptions.';
+  end if;
+  if (select count(*) from public.inscriptions where sortie_id = new.sortie_id) >= s.places then
+    raise exception 'Désolé, cette sortie est complète.';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger avant_inscription
+  before insert on public.inscriptions
+  for each row execute function public.verifier_inscription();
 
 -- ---------- Règles d'accès (RLS) – voir risque R7 du TD2 ----------
 

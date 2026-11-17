@@ -1,5 +1,5 @@
 /*
- * fantaPLASTIC – couche de données (sprints 1 et 2)
+ * fantaPLASTIC – couche de données
  *
  * Version "démo locale" : les données sont rangées dans le navigateur (localStorage).
  * Les fonctions ont la même forme (async) que celles qu'on aura avec Supabase,
@@ -227,7 +227,44 @@
       var s = d.sorties.find(function (x) { return x.id === id; });
       if (!s) return null;
       var orga = d.profiles.find(function (p) { return p.id === s.organisateur_id; });
-      return Object.assign(enrichir(s, d), { organisateur_prenom: orga ? orga.prenom : null });
+      var session = lire(CLE_SESSION);
+      var inscrit = !!session && d.inscriptions.some(function (i) { return i.sortie_id === s.id && i.benevole_id === session.profil_id; });
+      return Object.assign(enrichir(s, d), { organisateur_prenom: orga ? orga.prenom : null, je_suis_inscrit: inscrit });
+    }
+
+    // ---------- US14 : s'inscrire à une sortie, après le formulaire de sécurité ----------
+
+    // engagements = { risques_acceptes: true, engagement_incidents: true } (les deux cases du formulaire)
+    async function inscrireASortie(sortieId, engagements) {
+      var moi = await utilisateurCourant();
+      if (!moi) throw new Error("Connecte-toi pour t'inscrire à une sortie.");
+      var d = donnees();
+      var s = d.sorties.find(function (x) { return x.id === sortieId; });
+      if (!s || s.statut === 'annulee' || new Date(s.date_debut).getTime() < Date.now()) {
+        throw new Error("Cette sortie n'est plus ouverte aux inscriptions.");
+      }
+      if (!engagements || engagements.risques_acceptes !== true || engagements.engagement_incidents !== true) {
+        throw new Error("Coche les deux engagements de sécurité pour t'inscrire.");
+      }
+      if (d.inscriptions.some(function (i) { return i.sortie_id === s.id && i.benevole_id === moi.id; })) {
+        throw new Error('Tu es déjà inscrit·e à cette sortie.');
+      }
+      if (enrichir(s, d).places_restantes <= 0) throw new Error('Désolé, cette sortie est complète.');
+
+      var maintenant = new Date().toISOString();
+      // On garde la date à laquelle le bénévole a accepté les consignes de sécurité
+      d.inscriptions.push({ id: nouvelId(), sortie_id: s.id, benevole_id: moi.id, securite_acceptee_le: maintenant, created_at: maintenant });
+      sauver();
+      return obtenirSortie(s.id);
+    }
+
+    async function desinscrireDeSortie(sortieId) {
+      var moi = await utilisateurCourant();
+      if (!moi) throw new Error("Connecte-toi d'abord.");
+      var d = donnees();
+      d.inscriptions = d.inscriptions.filter(function (i) { return !(i.sortie_id === sortieId && i.benevole_id === moi.id); });
+      sauver();
+      return obtenirSortie(sortieId);
     }
 
     // ---------- US2 : un organisateur crée une sortie ----------
@@ -305,6 +342,8 @@
       listerSortiesAVenir: listerSortiesAVenir,
       obtenirSortie: obtenirSortie,
       creerSortie: creerSortie,
+      inscrireASortie: inscrireASortie,
+      desinscrireDeSortie: desinscrireDeSortie,
       changerRoleDemo: changerRoleDemo,
       materielSecurite: MATERIEL_SECURITE.slice(),
       reinitialiser: reinitialiser,

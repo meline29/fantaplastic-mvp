@@ -1,5 +1,5 @@
 /*
- * fantaPLASTIC – écrans du MVP (sprints 1 et 2)
+ * fantaPLASTIC – écrans du MVP
  * React sans étape de build : on écrit les composants avec htm (équivalent du JSX).
  */
 (function () {
@@ -40,6 +40,10 @@
   // Date du jour au format des champs <input type="date"> : "2026-11-17"
   function dateLocale(d) {
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function IconeCoche() {
+    return html`<svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>`;
   }
 
   function IconePlus() {
@@ -111,8 +115,35 @@
       </ul>`;
   }
 
+  // US14 : bouton d'inscription (ou état de l'inscription) en bas de la fiche
+  function BlocInscription(props) {
+    var s = props.sortie;
+    if (s.je_suis_inscrit) {
+      return html`
+        <div className="mt-4 rounded-xl bg-lagon/15 p-4">
+          <p className="flex items-center gap-2 font-semibold text-lagon-fonce"><${IconeCoche} />Tu es inscrit·e à cette sortie</p>
+          <p className="mt-1 text-sm text-slate-700">Un incident pendant la sortie, physique ou moral ? Tu t'es engagé·e à le signaler à l'asso : préviens l'organisateur sur place ou l'asso après coup.</p>
+          <button type="button" className="mt-2 text-sm text-slate-500 underline" onClick=${props.onDesinscrire}>Me désinscrire</button>
+        </div>`;
+    }
+    if (s.places_restantes <= 0) {
+      return html`<p className="mt-4 rounded-xl bg-slate-100 p-3 text-center text-sm font-semibold text-slate-600">Sortie complète : plus d'inscription possible</p>`;
+    }
+    var classe = 'mt-4 w-full rounded-xl bg-soleil px-4 py-3 font-semibold text-marine transition hover:bg-soleil/90';
+    return props.utilisateur
+      ? html`<button type="button" className=${classe} onClick=${props.onInscrire}>Je m'inscris</button>`
+      : html`<button type="button" className=${classe} onClick=${props.onSeConnecter}>Me connecter pour m'inscrire</button>`;
+  }
+
   function DetailSortie(props) {
     var _s = useState(undefined), s = _s[0], setS = _s[1];
+
+    function desinscrire() {
+      db.desinscrireDeSortie(props.id).then(function (maj) {
+        setS(maj);
+        props.onDesinscrit();
+      });
+    }
 
     useEffect(function () {
       db.obtenirSortie(props.id).then(setS);
@@ -146,6 +177,8 @@
           <p className="mt-3 text-sm text-slate-500">
             ${s.nb_inscrits} inscrit${s.nb_inscrits > 1 ? 's' : ''} sur ${s.places} places${s.organisateur_prenom ? ' · organisée par ' + s.organisateur_prenom : ''}
           </p>
+          <${BlocInscription} sortie=${s} utilisateur=${props.utilisateur}
+            onInscrire=${props.onInscrire} onSeConnecter=${props.onSeConnecter} onDesinscrire=${desinscrire} />
         </section>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-marine/10">
@@ -378,6 +411,90 @@
       </section>`;
   }
 
+  // ---------- US14 : formulaire de sécurité, au moment de s'inscrire ----------
+
+  var RISQUES = [
+    { titre: 'Blessure', detail: "Objets lourds ou dangereux (seringues, bidons, produits inconnus) : on n'y touche pas, on prévient l'organisateur." },
+    { titre: 'Coupure', detail: 'Verre cassé, métal rouillé : on ramasse toujours avec des gants ou une pince, jamais à mains nues.' },
+    { titre: 'Chute', detail: 'Rochers glissants, algues, vase : chaussures fermées, on regarde où on met les pieds et on surveille la marée.' }
+  ];
+
+  function CaseEngagement(props) {
+    return html`
+      <label className=${'flex cursor-pointer items-start gap-3 rounded-xl border-2 p-3 transition ' + (props.checked ? 'border-lagon bg-lagon/10' : 'border-slate-200 bg-white hover:border-slate-300')}>
+        <input type="checkbox" name=${props.name} checked=${props.checked} onChange=${function (e) { props.onChange(e.target.checked); }}
+          className="mt-0.5 h-5 w-5 shrink-0 accent-lagon-fonce" />
+        <span className="text-sm text-slate-800">${props.children}</span>
+      </label>`;
+  }
+
+  function FormulaireSecurite(props) {
+    var _s = useState(null), s = _s[0], setS = _s[1];
+    var _r = useState(false), risques = _r[0], setRisques = _r[1];
+    var _i = useState(false), incidents = _i[0], setIncidents = _i[1];
+    var _err = useState(''), erreur = _err[0], setErreur = _err[1];
+    var _env = useState(false), envoi = _env[0], setEnvoi = _env[1];
+
+    useEffect(function () {
+      db.obtenirSortie(props.id).then(setS);
+    }, [props.id]);
+
+    async function valider(e) {
+      e.preventDefault();
+      setErreur('');
+      setEnvoi(true);
+      try {
+        var maj = await db.inscrireASortie(props.id, { risques_acceptes: risques, engagement_incidents: incidents });
+        props.onInscrit(maj);
+      } catch (err) {
+        setErreur(err.message);
+        setEnvoi(false);
+      }
+    }
+
+    return html`
+      <section className="mx-auto max-w-md rounded-2xl bg-white p-6 shadow-sm ring-1 ring-marine/10">
+        <h2 className="text-xl font-bold text-marine">Avant de t'inscrire : la sécurité</h2>
+        ${s ? html`<p className="mt-1 text-sm text-slate-600">${s.titre} · ${majuscule(formatJour.format(new Date(s.date_debut)))}</p>` : null}
+
+        <h3 className="mt-5 font-bold text-marine">Les risques pendant un ramassage</h3>
+        <ul className="mt-2 space-y-2">
+          ${RISQUES.map(function (r) {
+            return html`<li key=${r.titre} className="rounded-xl bg-corail/10 p-3">
+              <p className="font-semibold text-corail-fonce">${r.titre}</p>
+              <p className="mt-0.5 text-sm text-slate-700">${r.detail}</p>
+            </li>`;
+          })}
+        </ul>
+
+        <h3 className="mt-5 font-bold text-marine">L'asso fournit à chaque sortie</h3>
+        <ul className="mt-2 space-y-1.5">
+          ${db.materielSecurite.map(function (objet) {
+            return html`<li key=${objet} className="flex items-start gap-2.5 text-slate-800">
+              <span aria-hidden="true" className="mt-2 h-2 w-2 shrink-0 rounded-full bg-lagon-fonce"></span>${objet}
+            </li>`;
+          })}
+        </ul>
+
+        <form className="mt-5 space-y-3" onSubmit=${valider} noValidate=${true}>
+          <${CaseEngagement} name="risques" checked=${risques} onChange=${setRisques}>
+            J'ai lu les risques (blessure, coupure, chute) et je suivrai les consignes de l'organisateur.
+          </${CaseEngagement}>
+          <${CaseEngagement} name="incidents" checked=${incidents} onChange=${setIncidents}>
+            Je m'engage à remonter à l'association tout incident, physique ou moral, qui arrive pendant la sortie.
+          </${CaseEngagement}>
+          ${erreur ? html`<p role="alert" className="rounded-xl bg-corail/10 px-3 py-2 text-sm text-corail-fonce">${erreur}</p>` : null}
+          <button type="submit" disabled=${envoi}
+            className="w-full rounded-xl bg-marine px-4 py-3 font-semibold text-white transition hover:bg-marine/90 disabled:opacity-60">
+            ${envoi ? 'Un instant…' : 'Je confirme mon inscription'}
+          </button>
+        </form>
+        <p className="mt-4 text-center">
+          <button type="button" className="text-sm text-slate-500 underline" onClick=${props.onAnnuler}>Annuler</button>
+        </p>
+      </section>`;
+  }
+
   // ---------- onglets ----------
 
   function Icone(props) {
@@ -458,6 +575,7 @@
     var _s = useState(null), sorties = _s[0], setSorties = _s[1];
     var _m = useState(''), message = _m[0], setMessage = _m[1];
     var _d = useState(null), sortieOuverte = _d[0], setSortieOuverte = _d[1];
+    var _rd = useState(false), retourFiche = _rd[0], setRetourFiche = _rd[1]; // revenir sur la fiche après connexion
     var estOrganisateur = !!utilisateur && (utilisateur.role === 'organisateur' || utilisateur.role === 'admin');
 
     function chargerSorties() {
@@ -477,7 +595,8 @@
 
     function connecte(profil, nouveau) {
       setUtilisateur(profil);
-      setVue('accueil');
+      setVue(retourFiche ? 'detail' : 'accueil');
+      setRetourFiche(false);
       setMessage(nouveau
         ? 'Bienvenue ' + profil.prenom + ', ton compte ' + nomRole(profil.role).toLowerCase() + ' est créé !'
         : 'Bonjour ' + profil.prenom + ' !');
@@ -489,6 +608,11 @@
         setVue('accueil');
         setMessage('Tu es déconnecté·e. À bientôt sur la grève !');
       });
+    }
+
+    function seConnecter() {
+      setRetourFiche(vue === 'detail');
+      setVue('connexion');
     }
 
     function choisirOnglet(id) {
@@ -514,6 +638,13 @@
       setMessage('Ta sortie est publiée !');
     }
 
+    function inscrit() {
+      chargerSorties();
+      setVue('detail');
+      window.scrollTo(0, 0);
+      setMessage("C'est noté, tu es inscrit·e ! À bientôt sur la grève.");
+    }
+
     function changerRole(role) {
       db.changerRoleDemo(role).then(function (profil) {
         setUtilisateur(profil);
@@ -537,12 +668,18 @@
         mode=${vue}
         onConnecte=${connecte}
         onBasculer=${function () { setVue(vue === 'connexion' ? 'inscription' : 'connexion'); }}
-        onAnnuler=${function () { setVue('accueil'); }}
+        onAnnuler=${function () { setRetourFiche(false); setVue('accueil'); }}
       />`;
     } else if (vue === 'creation' && estOrganisateur) {
       contenu = html`<${FormulaireSortie} onCreee=${sortieCreee} onAnnuler=${retourAuxSorties} />`;
-    } else if (vue === 'detail') {
-      contenu = html`<${DetailSortie} key=${sortieOuverte} id=${sortieOuverte} onRetour=${retourAuxSorties} />`;
+    } else if (vue === 'securite' && utilisateur) {
+      contenu = html`<${FormulaireSecurite} id=${sortieOuverte} onInscrit=${inscrit} onAnnuler=${function () { setVue('detail'); }} />`;
+    } else if (vue === 'detail' || vue === 'securite') {
+      contenu = html`<${DetailSortie} key=${sortieOuverte} id=${sortieOuverte} utilisateur=${utilisateur}
+        onRetour=${retourAuxSorties}
+        onInscrire=${function () { setVue('securite'); window.scrollTo(0, 0); }}
+        onSeConnecter=${seConnecter}
+        onDesinscrit=${function () { chargerSorties(); setMessage('Tu es désinscrit·e de cette sortie.'); }} />`;
     } else if (onglet === 'sorties') {
       contenu = html`
         <div>
@@ -581,7 +718,7 @@
         <${EnTete}
           utilisateur=${utilisateur}
           onAccueil=${function () { choisirOnglet('sorties'); }}
-          onConnexion=${function () { setVue('connexion'); }}
+          onConnexion=${seConnecter}
           onDeconnexion=${deconnexion}
         />
         ${message ? html`<div role="status" className="mx-auto mt-3 max-w-3xl px-4"><p className="rounded-xl bg-marine px-4 py-2 text-sm text-white shadow">${message}</p></div>` : null}
