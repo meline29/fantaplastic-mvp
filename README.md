@@ -4,12 +4,14 @@ Application web (PWA) pour les bénévoles ramasseurs de la rade de Brest.
 
 ## Lancer l'appli
 
-- **Le plus simple :** double-cliquer sur `index.html` (il faut une connexion internet, car React et Tailwind sont chargés depuis un CDN).
-- **Ou avec un petit serveur :** `python -m http.server 8000` dans ce dossier, puis ouvrir http://localhost:8000
+- **En ligne :** le site est hébergé sur Vercel et les données sont dans Supabase (voir « Mise en ligne » plus bas).
+- **En local :** double-cliquer sur `index.html`, ou `python -m http.server 8000` dans ce dossier puis ouvrir http://localhost:8000 (il faut internet, car React, Tailwind et Supabase sont chargés depuis un CDN).
+- **Deux modes :** si `js/config.js` contient l'URL et la clé Supabase, l'appli utilise la vraie base. Sinon, ou si on ajoute `?mode=local` à l'adresse, elle tourne en **démo locale** (données dans le navigateur, bascule « Démo · rôle » et remise à zéro disponibles).
 
-Les tests s'ouvrent de la même façon :
+Les tests s'ouvrent de la même façon (ils tournent toujours sur la démo locale) :
 - `tests/index.html` : 49 tests de la couche de données (comptes, rôles, liste et fiche des sorties, création d'une sortie, matériel de sécurité, inscription) ;
 - `tests/ui.html` : rejoue le parcours dans l'appli, en 38 étapes (sorties, fiche d'une sortie, création de compte organisateur, création d'une sortie, bascule de rôle, formulaire de sécurité et inscription, onglets, connexion). **Attention, il remet les données de démo à zéro.**
+- `tests/supabase.html` : vérifie la base en ligne, en lecture seule (config remplie, script SQL exécuté, règles d'accès qui bloquent un visiteur).
 
 ## Revenir à une version précédente (git)
 
@@ -27,8 +29,11 @@ git switch main                # revenir à la dernière version
 |---|---|
 | `index.html` | page unique, charge React 18, htm (JSX sans compilation) et Tailwind |
 | `js/app.js` | les écrans : en-tête, accueil, liste et fiche des sorties, création d'une sortie, formulaires de compte, onglets |
-| `js/db.js` | la couche de données. Pour l'instant en « démo locale » (stockage du navigateur), avec les mêmes fonctions que celles qu'on aura avec Supabase |
-| `supabase/schema.sql` | tables, règles d'accès (RLS) et sorties d'exemple pour Supabase |
+| `js/regles.js` | les règles communes : contrôles des comptes et des sorties, matériel de sécurité, engagements |
+| `js/db.js` | la couche de données en « démo locale » (stockage du navigateur) |
+| `js/db-supabase.js` | la même couche de données, branchée sur Supabase (comptes, base PostgreSQL) |
+| `js/config.js` | l'URL du projet Supabase et sa clé publique « anon » (jamais la clé « service_role ») |
+| `supabase/schema.sql` | tables, règles d'accès (RLS), triggers et sorties d'exemple, à exécuter une fois dans Supabase |
 | `manifest.webmanifest`, `assets/` | icônes et logo, pour installer l'appli sur un téléphone |
 
 Il n'y a pas d'étape de build, parce que Node n'était pas installé sur le poste utilisé. Si l'équipe passe à Vite + TypeScript plus tard, les composants de `app.js` se reprennent tels quels.
@@ -78,3 +83,17 @@ Le **formulaire de sécurité** s'affiche au moment de l'inscription :
 Une fois inscrit, la fiche rappelle de signaler tout incident à l'asso.
 
 **Matériel de sécurité :** l'asso fournit toujours des **gilets jaunes** et une **trousse de premiers secours**. Ils sont ajoutés automatiquement en tête de « Ce que l'asso apporte » pour chaque sortie (contrainte équivalente dans `supabase/schema.sql`).
+
+## Mise en ligne (GitHub + Supabase + Vercel)
+
+1. **GitHub** : le code est sur un dépôt GitHub. Chaque `git push` sur `main` met le site à jour.
+2. **Supabase** (base de données et comptes), dans un projet hébergé en Europe :
+   - SQL Editor > New query > coller `supabase/schema.sql` > Run (une seule fois) ;
+   - Authentication > Sign In / Providers > Email : « Confirm email » désactivé pour le MVP (l'envoi d'emails gratuit de Supabase est limité à quelques messages par heure) ;
+   - Project Settings > API : copier la « Project URL » et la clé « anon public » dans `js/config.js`.
+3. **Vercel** (hébergement) : Add New > Project > importer le dépôt GitHub, Framework Preset « Other », aucune commande de build, puis Deploy. Ensuite, dans Supabase > Authentication > URL Configuration, mettre l'adresse Vercel comme « Site URL ».
+4. **Vérifier** : ouvrir `https://<adresse-vercel>/tests/supabase.html`, puis faire le parcours complet sur téléphone (compte organisateur, création d'une sortie, compte bénévole, inscription avec le formulaire de sécurité).
+
+À savoir :
+- un projet Supabase gratuit se met en pause après une semaine sans activité : il se relance depuis le tableau de bord ;
+- les sorties d'exemple sont datées de J+3 à J+14 à partir du jour où le script SQL a été lancé : une fois passées, il faut en créer de nouvelles dans l'appli.

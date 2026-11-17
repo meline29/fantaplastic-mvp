@@ -1,6 +1,9 @@
 -- fantaPLASTIC – schéma de la base (tâche T2)
--- À coller dans Supabase > SQL Editor quand le projet Supabase de l'équipe est créé.
--- Pas encore exécuté : à tester au sprint 2 en branchant l'appli sur Supabase.
+-- À exécuter UNE SEULE FOIS dans un projet Supabase neuf :
+--   Supabase > SQL Editor > New query > coller tout ce fichier > Run
+-- Résultat attendu : « Success. No rows returned ».
+-- Si une première exécution s'est arrêtée à moitié, lancer d'abord le bloc
+-- « Tout recommencer » tout en bas du fichier.
 
 -- ---------- Tables ----------
 
@@ -85,15 +88,19 @@ $$;
 -- Vue exécutée avec les droits de son propriétaire : elle peut compter toutes les
 -- inscriptions sans montrer qui est inscrit.
 
+-- Elle donne aussi le prénom de l'organisateur (et seulement lui), pour la fiche (US4).
+
 create view public.sorties_a_venir as
 select s.*,
-       count(i.id)::int              as nb_inscrits,
-       s.places - count(i.id)::int   as places_restantes
+       count(i.id)::int                          as nb_inscrits,
+       greatest(s.places - count(i.id)::int, 0)  as places_restantes,
+       p.prenom                                  as organisateur_prenom
 from public.sorties s
 left join public.inscriptions i on i.sortie_id = s.id
+left join public.profiles p     on p.id = s.organisateur_id
 where s.date_debut >= now()
   and s.statut <> 'annulee'
-group by s.id
+group by s.id, p.id
 order by s.date_debut;
 
 grant select on public.sorties_a_venir to anon, authenticated;
@@ -121,6 +128,16 @@ create trigger avant_inscription
   before insert on public.inscriptions
   for each row execute function public.verifier_inscription();
 
+-- ---------- Droits de base de l'API (anon = visiteur, authenticated = connecté) ----------
+-- Les règles RLS ci-dessous filtrent ensuite ligne par ligne.
+
+grant usage on schema public to anon, authenticated;
+grant select on public.sorties to anon, authenticated;
+grant insert, update on public.sorties to authenticated;
+grant select on public.profiles to authenticated;
+grant select, insert, delete on public.inscriptions to authenticated;
+grant select, insert on public.signalements to authenticated;
+
 -- ---------- Règles d'accès (RLS) – voir risque R7 du TD2 ----------
 
 alter table public.profiles     enable row level security;
@@ -133,7 +150,7 @@ create policy "profils_lecture" on public.profiles
   for select using (id = auth.uid() or public.mon_role() in ('organisateur', 'admin'));
 
 -- On ne peut modifier que son prénom (pas son rôle). La bascule « Démo · rôle » de
--- l'appli n'existe donc qu'en démo locale : à retirer quand on branche Supabase.
+-- l'appli n'existe donc qu'en démo locale (elle est masquée quand on est sur Supabase).
 create policy "profils_modif_perso" on public.profiles
   for update using (id = auth.uid()) with check (id = auth.uid());
 revoke update on public.profiles from authenticated;
@@ -163,13 +180,23 @@ create policy "signalements_lecture" on public.signalements
   for select using (auteur_id = auth.uid() or public.mon_role() in ('organisateur', 'admin'));
 
 -- ---------- Sorties d'exemple (tâche J-1 du TD1) ----------
+-- Dates calculées à partir du jour où le script est lancé (J+3 à J+14), à l'heure de Brest.
+-- Une fois passées, elles disparaissent de la liste : les organisateurs en créent d'autres dans l'appli.
 
 insert into public.sorties (titre, lieu, commune, date_debut, duree_min, places, materiel_fourni, materiel_a_apporter, lat, lng) values
-  ('Ramassage à la plage du Moulin Blanc', 'Plage du Moulin Blanc', 'Brest', date_trunc('day', now()) + interval '3 days 10 hours', 120, 25,
+  ('Ramassage à la plage du Moulin Blanc', 'Plage du Moulin Blanc', 'Brest', (date_trunc('day', now() at time zone 'Europe/Paris') + interval '3 days 10 hours') at time zone 'Europe/Paris', 120, 25,
    array['Gilets jaunes', 'Trousse de premiers secours', 'Sacs poubelle', 'Pinces de ramassage', 'Seaux pour le tri'], array['Gants de jardinage', 'Chaussures fermées', 'Une gourde'], 48.3925, -4.4330),
-  ('Nettoyage de l''anse de Sainte-Anne-du-Portzic', 'Anse de Sainte-Anne-du-Portzic', 'Brest', date_trunc('day', now()) + interval '6 days 14 hours', 90, 15,
+  ('Nettoyage de l''anse de Sainte-Anne-du-Portzic', 'Anse de Sainte-Anne-du-Portzic', 'Brest', (date_trunc('day', now() at time zone 'Europe/Paris') + interval '6 days 14 hours') at time zone 'Europe/Paris', 90, 15,
    array['Gilets jaunes', 'Trousse de premiers secours', 'Sacs poubelle', 'Gants'], array['Bottes', 'Un coupe-vent'], 48.3590, -4.5510),
-  ('Grève du Dellec', 'Plage du Dellec', 'Plouzané', date_trunc('day', now()) + interval '10 days 9 hours 30 minutes', 120, 20,
+  ('Grève du Dellec', 'Plage du Dellec', 'Plouzané', (date_trunc('day', now() at time zone 'Europe/Paris') + interval '10 days 9 hours 30 minutes') at time zone 'Europe/Paris', 120, 20,
    array['Gilets jaunes', 'Trousse de premiers secours', 'Sacs poubelle', 'Pinces de ramassage', 'Gants'], array['Bottes', 'Une gourde', 'Des vêtements chauds'], 48.3555, -4.5680),
-  ('Ramassage au port du Tinduff', 'Port du Tinduff', 'Plougastel-Daoulas', date_trunc('day', now()) + interval '14 days 10 hours', 150, 30,
+  ('Ramassage au port du Tinduff', 'Port du Tinduff', 'Plougastel-Daoulas', (date_trunc('day', now() at time zone 'Europe/Paris') + interval '14 days 10 hours') at time zone 'Europe/Paris', 150, 30,
    array['Gilets jaunes', 'Trousse de premiers secours', 'Sacs poubelle', 'Pinces de ramassage', 'Une brouette pour les gros déchets'], array['Gants', 'Bottes', 'Un en-cas'], 48.3355, -4.3720);
+
+-- ---------- Tout recommencer (EFFACE toutes les données de l'appli) ----------
+-- À n'utiliser que si le script a planté à moitié. Enlever les « -- » des lignes suivantes,
+-- les exécuter seules, puis relancer tout le fichier.
+-- drop trigger if exists on_auth_user_created on auth.users;
+-- drop view if exists public.sorties_a_venir;
+-- drop table if exists public.signalements, public.inscriptions, public.sorties, public.profiles cascade;
+-- drop function if exists public.creer_profil(), public.mon_role(), public.verifier_inscription();

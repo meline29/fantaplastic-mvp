@@ -192,7 +192,8 @@
       localStorage.removeItem('fantaplastic.db.v1');
       localStorage.removeItem('fantaplastic.session.v1');
     } catch (e) { /* stockage indisponible : l'appli utilisera la mémoire */ }
-    document.getElementById('app').src = '../index.html';
+    // ?mode=local : le test tourne toujours sur la démo locale, même si Supabase est configuré
+    document.getElementById('app').src = '../index.html?mode=local';
   </script>
 </body>
 </html>

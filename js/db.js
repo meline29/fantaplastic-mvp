@@ -1,21 +1,15 @@
 /*
- * fantaPLASTIC – couche de données
+ * fantaPLASTIC – couche de données, version « démo locale »
  *
- * Version "démo locale" : les données sont rangées dans le navigateur (localStorage).
- * Les fonctions ont la même forme (async) que celles qu'on aura avec Supabase,
- * pour pouvoir brancher la vraie base au sprint 2 sans toucher aux écrans.
+ * Les données sont rangées dans le navigateur (localStorage). Les fonctions ont exactement
+ * la même forme (async) que celles de db-supabase.js : les écrans ne voient pas la différence.
  * Les tables imitent celles de supabase/schema.sql : profiles, sorties, inscriptions.
+ * Les contrôles (comptes, sorties, sécurité) sont dans regles.js, communs aux deux versions.
  */
 (function () {
   'use strict';
 
-  var EMAIL_OK = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-  // Rôles qu'on peut choisir soi-même en créant son compte (admin : jamais)
-  var ROLES_INSCRIPTION = ['benevole', 'organisateur'];
-  // Rôles qui ont le droit de créer une sortie (US2)
-  var ROLES_ORGANISATION = ['organisateur', 'admin'];
-  // Sécurité : l'asso fournit toujours ce matériel, à chaque sortie
-  var MATERIEL_SECURITE = ['Gilets jaunes', 'Trousse de premiers secours'];
+  var R = window.FantaRegles;
 
   function creerDB(options) {
     var prefixe = (options && options.prefixe) || 'fantaplastic';
@@ -64,7 +58,7 @@
         }).join('');
       }
       // Repli si le navigateur refuse crypto.subtle : suffisant pour une démo locale,
-      // la vraie authentification sera faite par Supabase.
+      // la vraie authentification est faite par Supabase.
       var h = 0;
       for (var i = 0; i < data.length; i++) h = (h * 31 + data[i]) | 0;
       return 'x' + (h >>> 0).toString(16);
@@ -92,7 +86,7 @@
         var s = {
           id: nouvelId(), titre: x.titre, lieu: x.lieu, commune: x.commune,
           date_debut: dansNJours(x.j, x.h, x.m), duree_min: x.duree, places: x.places,
-          materiel_fourni: avecSecurite(x.fourni), materiel_a_apporter: x.apporter,
+          materiel_fourni: R.avecSecurite(x.fourni), materiel_a_apporter: x.apporter,
           lat: x.lat, lng: x.lng, statut: 'prevue', organisateur_id: orga.id, created_at: maintenant
         };
         sorties.push(s);
@@ -118,33 +112,12 @@
       ecrire(CLE_DB, cache);
     }
 
-    // Le matériel est rangé sous forme de liste : ['Sacs', 'Pinces']. On accepte aussi un texte
-    // "Sacs, pinces" (saisie du formulaire, ou données enregistrées avant le sprint 2).
-    function enListe(valeur) {
-      var morceaux = Array.isArray(valeur) ? valeur : String(valeur || '').split(/[,;\n]/);
-      return morceaux
-        .map(function (x) { return String(x).trim(); })
-        .filter(function (x) { return x.length > 0; })
-        .map(function (x) { return x.charAt(0).toUpperCase() + x.slice(1); });
-    }
-
-    // Met le matériel de sécurité en tête de la liste de l'asso, sans doublon
-    // ("gilet jaune" écrit par l'organisateur = "Gilets jaunes")
-    function cleObjet(x) {
-      return x.toLowerCase().replace(/s\b/g, '').trim();
-    }
-
-    function avecSecurite(liste) {
-      var cles = MATERIEL_SECURITE.map(cleObjet);
-      return MATERIEL_SECURITE.concat(liste.filter(function (o) { return cles.indexOf(cleObjet(o)) === -1; }));
-    }
-
     // Ajoute à une sortie ce que l'écran affiche : nombre d'inscrits, places restantes, matériel en liste
     function enrichir(s, d) {
       var nb = d.inscriptions.filter(function (i) { return i.sortie_id === s.id; }).length;
       return Object.assign({}, s, {
-        materiel_fourni: avecSecurite(enListe(s.materiel_fourni)),
-        materiel_a_apporter: enListe(s.materiel_a_apporter),
+        materiel_fourni: R.avecSecurite(R.enListe(s.materiel_fourni)),
+        materiel_a_apporter: R.enListe(s.materiel_a_apporter),
         nb_inscrits: nb,
         places_restantes: Math.max(0, s.places - nb)
       });
@@ -161,25 +134,15 @@
     // ---------- US15 : créer un compte / se connecter ----------
 
     async function inscrire(champs) {
-      var prenom = String((champs && champs.prenom) || '').trim();
-      var email = String((champs && champs.email) || '').trim().toLowerCase();
-      var motDePasse = String((champs && champs.motDePasse) || '');
-      var role = (champs && champs.role) || 'benevole';
-
-      if (ROLES_INSCRIPTION.indexOf(role) === -1) throw new Error('Choisis si tu es bénévole ou organisateur.');
-      if (!prenom) throw new Error('Indique ton prénom.');
-      if (prenom.length > 40) throw new Error('Ton prénom doit faire 40 caractères maximum.');
-      if (!EMAIL_OK.test(email)) throw new Error("L'adresse email n'est pas valide.");
-      if (motDePasse.length < 8) throw new Error('Le mot de passe doit faire au moins 8 caractères.');
-
+      var c = R.validerCompte(champs);
       var d = donnees();
-      var existe = d.profiles.some(function (p) { return p.email === email; });
+      var existe = d.profiles.some(function (p) { return p.email === c.email; });
       if (existe) throw new Error('Un compte existe déjà avec cet email. Connecte-toi plutôt.');
 
-      var profil = { id: nouvelId(), prenom: prenom, email: email, role: role, created_at: new Date().toISOString() };
+      var profil = { id: nouvelId(), prenom: c.prenom, email: c.email, role: c.role, created_at: new Date().toISOString() };
       var sel = nouvelId();
       d.profiles.push(profil);
-      d.comptes.push({ profil_id: profil.id, sel: sel, empreinte: await hacher(motDePasse, sel) });
+      d.comptes.push({ profil_id: profil.id, sel: sel, empreinte: await hacher(c.motDePasse, sel) });
       sauver();
       ouvrirSession(profil.id);
       return profilPublic(profil);
@@ -234,7 +197,6 @@
 
     // ---------- US14 : s'inscrire à une sortie, après le formulaire de sécurité ----------
 
-    // engagements = { risques_acceptes: true, engagement_incidents: true } (les deux cases du formulaire)
     async function inscrireASortie(sortieId, engagements) {
       var moi = await utilisateurCourant();
       if (!moi) throw new Error("Connecte-toi pour t'inscrire à une sortie.");
@@ -243,9 +205,7 @@
       if (!s || s.statut === 'annulee' || new Date(s.date_debut).getTime() < Date.now()) {
         throw new Error("Cette sortie n'est plus ouverte aux inscriptions.");
       }
-      if (!engagements || engagements.risques_acceptes !== true || engagements.engagement_incidents !== true) {
-        throw new Error("Coche les deux engagements de sécurité pour t'inscrire.");
-      }
+      R.verifierEngagements(engagements);
       if (d.inscriptions.some(function (i) { return i.sortie_id === s.id && i.benevole_id === moi.id; })) {
         throw new Error('Tu es déjà inscrit·e à cette sortie.');
       }
@@ -270,47 +230,24 @@
     // ---------- US2 : un organisateur crée une sortie ----------
 
     async function creerSortie(champs) {
-      champs = champs || {};
       var moi = await utilisateurCourant();
       if (!moi) throw new Error('Connecte-toi pour créer une sortie.');
-      if (ROLES_ORGANISATION.indexOf(moi.role) === -1) throw new Error('Seuls les organisateurs peuvent créer une sortie.');
-
-      var titre = String(champs.titre || '').trim();
-      var lieu = String(champs.lieu || '').trim();
-      var commune = String(champs.commune || '').trim();
-      var debut = champs.date_debut ? new Date(champs.date_debut) : null;
-      var dureeMin = Number(champs.duree_min);
-      var places = Number(champs.places);
-      var fourni = enListe(champs.materiel_fourni);
-      var apporter = enListe(champs.materiel_a_apporter);
-
-      if (!titre) throw new Error('Donne un titre à la sortie.');
-      if (titre.length > 80) throw new Error('Le titre doit faire 80 caractères maximum.');
-      if (!lieu) throw new Error('Indique le lieu de rendez-vous.');
-      if (!commune) throw new Error('Indique la commune.');
-      if (!debut || isNaN(debut.getTime())) throw new Error("Choisis la date et l'heure de la sortie.");
-      if (debut.getTime() <= Date.now()) throw new Error('La sortie doit avoir lieu dans le futur.');
-      if (!Number.isInteger(dureeMin) || dureeMin < 30 || dureeMin > 480) throw new Error('La durée doit être comprise entre 30 min et 8 h.');
-      if (!Number.isInteger(places) || places < 1 || places > 500) throw new Error('Le nombre de places doit être compris entre 1 et 500.');
-      if (fourni.length > 20 || apporter.length > 20) throw new Error('20 objets maximum par liste de matériel.');
-      if (fourni.concat(apporter).some(function (o) { return o.length > 60; })) throw new Error('Chaque objet doit faire 60 caractères maximum.');
+      if (!R.peutOrganiser(moi.role)) throw new Error('Seuls les organisateurs peuvent créer une sortie.');
+      var colonnes = R.validerSortie(champs);
 
       var d = donnees();
-      var s = {
-        id: nouvelId(), titre: titre, lieu: lieu, commune: commune,
-        date_debut: debut.toISOString(), duree_min: dureeMin, places: places,
-        materiel_fourni: avecSecurite(fourni), materiel_a_apporter: apporter,
+      var s = Object.assign({ id: nouvelId() }, colonnes, {
         lat: null, lng: null, statut: 'prevue', organisateur_id: moi.id, created_at: new Date().toISOString()
-      };
+      });
       d.sorties.push(s);
       sauver();
       return obtenirSortie(s.id);
     }
 
     // Démo uniquement : passer de bénévole à organisateur sans recréer de compte, pour les revues.
-    // Avec Supabase, l'utilisateur ne pourra pas changer son rôle lui-même (voir schema.sql).
+    // N'existe pas avec Supabase, où l'utilisateur ne peut pas changer son rôle lui-même.
     async function changerRoleDemo(role) {
-      if (ROLES_INSCRIPTION.indexOf(role) === -1) throw new Error('Choisis si tu es bénévole ou organisateur.');
+      R.verifierRoleInscription(role);
       var session = lire(CLE_SESSION);
       var profil = session && donnees().profiles.find(function (p) { return p.id === session.profil_id; });
       if (!profil) throw new Error("Connecte-toi d'abord.");
@@ -335,6 +272,7 @@
     }
 
     return {
+      mode: 'local',
       inscrire: inscrire,
       connecter: connecter,
       deconnecter: deconnecter,
@@ -345,7 +283,7 @@
       inscrireASortie: inscrireASortie,
       desinscrireDeSortie: desinscrireDeSortie,
       changerRoleDemo: changerRoleDemo,
-      materielSecurite: MATERIEL_SECURITE.slice(),
+      materielSecurite: R.MATERIEL_SECURITE.slice(),
       reinitialiser: reinitialiser,
       _effacer: _effacer
     };

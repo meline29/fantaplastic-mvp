@@ -90,6 +90,13 @@
 
   function ListeSorties(props) {
     var sorties = props.sorties;
+    if (props.erreur) {
+      return html`
+        <div role="alert" className="rounded-2xl bg-corail/10 p-6 text-center text-corail-fonce">
+          <p>${props.erreur}</p>
+          <button type="button" className="mt-2 font-semibold underline" onClick=${props.onReessayer}>Réessayer</button>
+        </div>`;
+    }
     if (sorties === null) {
       return html`<p className="py-8 text-center text-slate-500">Chargement des sorties…</p>`;
     }
@@ -137,16 +144,21 @@
 
   function DetailSortie(props) {
     var _s = useState(undefined), s = _s[0], setS = _s[1];
+    var _e = useState(''), erreur = _e[0], setErreur = _e[1];
 
     function desinscrire() {
+      setErreur('');
       db.desinscrireDeSortie(props.id).then(function (maj) {
         setS(maj);
         props.onDesinscrit();
-      });
+      }).catch(function (err) { setErreur(err.message); });
     }
 
     useEffect(function () {
-      db.obtenirSortie(props.id).then(setS);
+      db.obtenirSortie(props.id).then(setS).catch(function (err) {
+        setErreur(err.message);
+        setS(null);
+      });
     }, [props.id]);
 
     var retour = html`
@@ -158,7 +170,7 @@
       return html`<div>${retour}<p className="py-8 text-center text-slate-500">Chargement…</p></div>`;
     }
     if (s === null) {
-      return html`<div>${retour}<p className="mt-4 rounded-2xl bg-white p-6 text-center text-slate-600 ring-1 ring-marine/10">Cette sortie n'existe plus.</p></div>`;
+      return html`<div>${retour}<p className="mt-4 rounded-2xl bg-white p-6 text-center text-slate-600 ring-1 ring-marine/10">${erreur || "Cette sortie n'existe plus."}</p></div>`;
     }
 
     var debut = new Date(s.date_debut);
@@ -179,6 +191,7 @@
           </p>
           <${BlocInscription} sortie=${s} utilisateur=${props.utilisateur}
             onInscrire=${props.onInscrire} onSeConnecter=${props.onSeConnecter} onDesinscrire=${desinscrire} />
+          ${erreur ? html`<p role="alert" className="mt-3 rounded-xl bg-corail/10 px-3 py-2 text-sm text-corail-fonce">${erreur}</p>` : null}
         </section>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-marine/10">
@@ -578,12 +591,15 @@
     var _rd = useState(false), retourFiche = _rd[0], setRetourFiche = _rd[1]; // revenir sur la fiche après connexion
     var estOrganisateur = !!utilisateur && (utilisateur.role === 'organisateur' || utilisateur.role === 'admin');
 
+    var _es = useState(''), erreurSorties = _es[0], setErreurSorties = _es[1];
+
     function chargerSorties() {
-      db.listerSortiesAVenir().then(setSorties);
+      setErreurSorties('');
+      db.listerSortiesAVenir().then(setSorties).catch(function (err) { setErreurSorties(err.message); });
     }
 
     useEffect(function () {
-      db.utilisateurCourant().then(setUtilisateur);
+      db.utilisateurCourant().then(setUtilisateur).catch(function () { setUtilisateur(null); });
       chargerSorties();
     }, []);
 
@@ -687,7 +703,7 @@
             ? html`<section className="rounded-2xl bg-lagon/15 p-5">
                 <p className="text-lg font-bold text-marine">Bonjour ${utilisateur.prenom} 👋</p>
                 <p className="mt-1 text-sm text-slate-700">Voici les prochaines sorties de ramassage dans la rade.</p>
-                <${BasculeRole} role=${utilisateur.role} onChanger=${changerRole} />
+                ${db.changerRoleDemo ? html`<${BasculeRole} role=${utilisateur.role} onChanger=${changerRole} />` : null}
               </section>`
             : html`<section className="rounded-2xl bg-marine p-6 text-white">
                 <p className="text-sm font-semibold uppercase tracking-wider text-lagon">Zéro déchets en rade de Brest</p>
@@ -706,7 +722,7 @@
                 </button>`
               : null}
           </div>
-          <${ListeSorties} sorties=${sorties} onOuvrir=${ouvrirSortie} />
+          <${ListeSorties} sorties=${sorties} erreur=${erreurSorties} onReessayer=${chargerSorties} onOuvrir=${ouvrirSortie} />
         </div>`;
     } else {
       var infos = ONGLETS.find(function (o) { return o.id === onglet; });
@@ -725,8 +741,10 @@
         <main className="mx-auto max-w-3xl px-4 py-5">${contenu}</main>
         ${onglet === 'sorties' || vue !== 'accueil'
           ? html`<footer className="mx-auto max-w-3xl px-4 pt-2 text-center text-xs text-slate-500">
-              <p>MVP · données de démonstration enregistrées dans ce navigateur</p>
-              <button type="button" className="mt-1 underline" onClick=${reinitialiser}>Réinitialiser les données de démo</button>
+              ${db.mode === 'supabase'
+                ? html`<p>MVP · version de test, données enregistrées en ligne (Supabase)</p>`
+                : html`<p>MVP · données de démonstration enregistrées dans ce navigateur</p>
+                  <button type="button" className="mt-1 underline" onClick=${reinitialiser}>Réinitialiser les données de démo</button>`}
             </footer>`
           : null}
         <div className="h-24" aria-hidden="true"></div>

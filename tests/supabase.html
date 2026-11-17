@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vérification Supabase</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 24px; background: #F6F1E7; color: #0B2A4A; }
+    li { margin: 6px 0; }
+    .ok { color: #0E7C74; }
+    .ko { color: #B3261E; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>Vérification de la base Supabase</h1>
+  <p>Cette page ne fait que lire : elle vérifie que js/config.js est rempli, que le script
+     supabase/schema.sql a bien été exécuté et que les règles d'accès bloquent un visiteur.</p>
+  <p id="resume">Vérification en cours…</p>
+  <ul id="liste"></ul>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" crossorigin></script>
+  <script src="../js/config.js"></script>
+  <script>
+    (async function () {
+      var nbOk = 0, nbKo = 0;
+      function noter(nom, ok, detail) {
+        var li = document.createElement('li');
+        li.className = ok ? 'ok' : 'ko';
+        li.textContent = (ok ? '✔ ' : '✘ ') + nom + (detail ? ' (' + detail + ')' : '');
+        document.getElementById('liste').appendChild(li);
+        if (ok) nbOk++; else nbKo++;
+      }
+      function fin() {
+        document.getElementById('resume').textContent = nbOk + ' vérification(s) OK, ' + nbKo + ' en échec';
+        document.getElementById('resume').className = nbKo ? 'ko' : 'ok';
+        document.title = (nbKo ? 'ECHEC ' : 'OK ') + nbOk + '/' + (nbOk + nbKo);
+      }
+
+      var config = window.FANTA_CONFIG || {};
+      var rempli = !!(config.supabaseUrl && config.supabaseAnonKey);
+      noter('js/config.js contient l\'URL et la clé anon', rempli);
+      noter('la librairie Supabase est chargée', !!(window.supabase && window.supabase.createClient));
+      if (!rempli || !window.supabase) return fin();
+      // La clé « service_role » donne tous les droits : elle ne doit jamais être dans le site
+      var contenuCle = '';
+      try { contenuCle = atob((config.supabaseAnonKey.split('.')[1] || '').replace(/-/g, '+').replace(/_/g, '/')); } catch (e) { /* clé « publishable » */ }
+      noter('ce n\'est pas la clé secrète « service_role »', !/service_role/.test(contenuCle) && !/^sb_secret_/.test(config.supabaseAnonKey));
+
+      // Client « visiteur » : on n'utilise pas la session éventuellement ouverte dans l'appli
+      var sb = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+      });
+
+      try {
+        var r = await sb.from('sorties_a_venir').select('*').order('date_debut');
+        noter('lecture des prochaines sorties (vue sorties_a_venir)', !r.error, r.error ? r.error.message : r.data.length + ' sortie(s)');
+        if (!r.error && r.data.length) {
+          var s = r.data[0];
+          noter('colonnes nb_inscrits, places_restantes, organisateur_prenom présentes',
+            'nb_inscrits' in s && 'places_restantes' in s && 'organisateur_prenom' in s);
+          noter('le matériel est une liste avec gilets jaunes et trousse de secours',
+            Array.isArray(s.materiel_fourni) && s.materiel_fourni.indexOf('Gilets jaunes') !== -1 && s.materiel_fourni.indexOf('Trousse de premiers secours') !== -1,
+            Array.isArray(s.materiel_fourni) ? s.materiel_fourni.join(', ') : typeof s.materiel_fourni);
+        }
+
+        var demain = new Date(Date.now() + 86400000).toISOString();
+        var essai = await sb.from('sorties').insert({
+          titre: 'Essai visiteur (doit être refusé)', lieu: 'Test', commune: 'Brest', date_debut: demain, duree_min: 60, places: 1,
+          materiel_fourni: ['Gilets jaunes', 'Trousse de premiers secours']
+        });
+        noter('un visiteur ne peut pas créer de sortie (règles RLS)', !!essai.error, essai.error ? essai.error.code + ' ' + essai.error.message : 'la sortie a été créée !');
+
+        var profils = await sb.from('profiles').select('id');
+        noter('un visiteur ne voit aucun profil', !!profils.error || profils.data.length === 0,
+          profils.error ? profils.error.message : profils.data.length + ' profil(s) visible(s)');
+
+        var inscriptions = await sb.from('inscriptions').select('id');
+        noter('un visiteur ne voit aucune inscription', !!inscriptions.error || inscriptions.data.length === 0,
+          inscriptions.error ? inscriptions.error.message : inscriptions.data.length + ' inscription(s) visible(s)');
+      } catch (e) {
+        noter('Erreur : ' + e.message, false);
+      }
+      fin();
+    })();
+  </script>
+</body>
+</html>
