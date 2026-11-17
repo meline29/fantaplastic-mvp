@@ -80,6 +80,20 @@
         noter('US15 – le compte créé est bien organisateur', texte().indexOf('compte organisateur est créé') !== -1 && texte().indexOf('Organisateur') !== -1);
         noter('US3 – la liste reste visible une fois connecté', doc.querySelectorAll('main li').length === 4);
 
+        // Onglets : seul "Sorties" a du contenu pour l'instant
+        var libelles = Array.from(doc.querySelectorAll('nav button')).map(function (b) { return b.textContent.trim(); });
+        noter('Onglets – Sorties, Carte, Signaler, Profil présents', libelles.join(',') === 'Sorties,Carte,Signaler,Profil');
+        var titres = { Carte: 'Carte', Signaler: 'Signaler un endroit pollué', Profil: 'Mon profil' };
+        for (var nom in titres) {
+          bouton(nom).click();
+          await attendreQue(function () { return !!doc.querySelector('main h1') && doc.querySelector('main h1').textContent === titres[nom]; });
+          var titreOk = !!doc.querySelector('main h1') && doc.querySelector('main h1').textContent === titres[nom];
+          noter('Onglets – « ' + nom + ' » s\'ouvre et reste vide', titreOk && doc.querySelectorAll('main li').length === 0);
+        }
+        bouton('Sorties').click();
+        await attendreQue(function () { return doc.querySelectorAll('main li').length === 4; });
+        noter('Onglets – retour sur « Sorties » : la liste est là', doc.querySelectorAll('main li').length === 4);
+
         bouton('Déconnexion').click();
         await attendreQue(function () { return !!bouton('Se connecter'); });
         noter('US15 – déconnexion', !!bouton('Se connecter'));

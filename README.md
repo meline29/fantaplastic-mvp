@@ -8,8 +8,18 @@ Application web (PWA) pour les bénévoles ramasseurs de la rade de Brest.
 - **Ou avec un petit serveur :** `python -m http.server 8000` dans ce dossier, puis ouvrir http://localhost:8000
 
 Les tests s'ouvrent de la même façon :
-- `tests/index.html` : 18 tests de la couche de données (comptes, liste des sorties) ;
-- `tests/ui.html` : rejoue le parcours du bénévole dans l'appli, en 10 étapes. **Attention, il remet les données de démo à zéro.**
+- `tests/index.html` : 20 tests de la couche de données (comptes, rôles, liste des sorties) ;
+- `tests/ui.html` : rejoue le parcours dans l'appli, en 19 étapes (sorties, création de compte avec choix du rôle, onglets, connexion). **Attention, il remet les données de démo à zéro.**
+
+## Revenir à une version précédente (git)
+
+```bash
+git log --oneline --decorate   # voir toutes les versions
+git switch --detach sprint-1   # regarder l'appli telle qu'elle était à la fin du sprint 1
+git switch main                # revenir à la dernière version
+```
+
+À la fin de chaque sprint, on marque la version avec un tag : `git tag -a sprint-2 -m "Fin du sprint 2"`.
 
 ## Organisation du code
 
@@ -35,3 +45,8 @@ Objectif proposé : *un bénévole peut créer son compte, se connecter et voir 
 | US3 – Consulter les prochaines sorties | 2 | Fait : sorties à venir triées par date, horaires, lieu, places restantes, « Complet » et « Plus que N places ». |
 
 Ce qui reste à décider en équipe : la Definition of Done (une US branchée sur le stockage local compte-t-elle comme « finie » ?) et la suite du backlog.
+
+## Depuis la fin du sprint 1
+
+- À la création du compte, on choisit son rôle : **bénévole** (par défaut) ou **organisateur**. Plus tard, un compte organisateur devra être validé par l'asso (TD2, R7).
+- Barre d'onglets en bas de l'écran : **Sorties**, **Carte**, **Signaler**, **Profil** (badges et profil). Seul « Sorties » a du contenu, les autres onglets sont prêts mais vides.

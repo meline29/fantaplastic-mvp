@@ -174,6 +174,58 @@
       </section>`;
   }
 
+  // ---------- onglets ----------
+
+  function Icone(props) {
+    return html`<svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">${props.children}</svg>`;
+  }
+  function IconeSorties() {
+    return html`<${Icone}><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M7 13h4M7 17h7"/></${Icone}>`;
+  }
+  function IconeCarte() {
+    return html`<${Icone}><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></${Icone}>`;
+  }
+  function IconeSignaler() {
+    return html`<${Icone}><path d="M4 8a2 2 0 0 1 2-2h2l1.5-2h5L16 6h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5"/></${Icone}>`;
+  }
+  function IconeProfil() {
+    return html`<${Icone}><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></${Icone}>`;
+  }
+
+  var ONGLETS = [
+    { id: 'sorties', label: 'Sorties', titre: 'Prochaines sorties', icone: IconeSorties },
+    { id: 'carte', label: 'Carte', titre: 'Carte', icone: IconeCarte },
+    { id: 'signaler', label: 'Signaler', titre: 'Signaler un endroit pollué', icone: IconeSignaler },
+    { id: 'profil', label: 'Profil', titre: 'Mon profil', icone: IconeProfil }
+  ];
+
+  function BarreOnglets(props) {
+    return html`
+      <nav aria-label="Navigation principale" className="fixed inset-x-0 bottom-0 z-10 border-t border-marine/10 bg-white/95 backdrop-blur">
+        <ul className="mx-auto grid max-w-3xl grid-cols-4">
+          ${ONGLETS.map(function (o) {
+            var actif = props.actif === o.id;
+            return html`
+              <li key=${o.id}>
+                <button type="button" aria-current=${actif ? 'page' : undefined} onClick=${function () { props.onChoisir(o.id); }}
+                  className=${'flex w-full flex-col items-center gap-0.5 pb-3 pt-2 text-xs font-medium transition ' + (actif ? 'text-lagon-fonce' : 'text-slate-500 hover:text-marine')}>
+                  <${o.icone} />${o.label}
+                </button>
+              </li>`;
+          })}
+        </ul>
+      </nav>`;
+  }
+
+  // Onglets préparés pour les prochains sprints : volontairement vides pour l'instant
+  function OngletVide(props) {
+    return html`
+      <section>
+        <h1 className="text-xl font-bold text-marine">${props.titre}</h1>
+        <p className="mt-2 text-sm text-slate-500">Bientôt disponible.</p>
+      </section>`;
+  }
+
   // ---------- application ----------
 
   function EnTete(props) {
@@ -198,6 +250,7 @@
   function App() {
     var _u = useState(null), utilisateur = _u[0], setUtilisateur = _u[1];
     var _v = useState('accueil'), vue = _v[0], setVue = _v[1];
+    var _o = useState('sorties'), onglet = _o[0], setOnglet = _o[1];
     var _s = useState(null), sorties = _s[0], setSorties = _s[1];
     var _m = useState(''), message = _m[0], setMessage = _m[1];
 
@@ -232,6 +285,12 @@
       });
     }
 
+    function choisirOnglet(id) {
+      setOnglet(id);
+      setVue('accueil');
+      window.scrollTo(0, 0);
+    }
+
     function reinitialiser() {
       db.reinitialiser().then(function () {
         setUtilisateur(null);
@@ -250,7 +309,7 @@
         onBasculer=${function () { setVue(vue === 'connexion' ? 'inscription' : 'connexion'); }}
         onAnnuler=${function () { setVue('accueil'); }}
       />`;
-    } else {
+    } else if (onglet === 'sorties') {
       contenu = html`
         <div>
           ${utilisateur
@@ -272,22 +331,29 @@
           <h2 className="mb-3 mt-6 text-lg font-bold text-marine">Prochaines sorties</h2>
           <${ListeSorties} sorties=${sorties} />
         </div>`;
+    } else {
+      var infos = ONGLETS.find(function (o) { return o.id === onglet; });
+      contenu = html`<${OngletVide} titre=${infos.titre} />`;
     }
 
     return html`
       <div className="min-h-screen bg-sable">
         <${EnTete}
           utilisateur=${utilisateur}
-          onAccueil=${function () { setVue('accueil'); }}
+          onAccueil=${function () { choisirOnglet('sorties'); }}
           onConnexion=${function () { setVue('connexion'); }}
           onDeconnexion=${deconnexion}
         />
         ${message ? html`<div role="status" className="mx-auto mt-3 max-w-3xl px-4"><p className="rounded-xl bg-marine px-4 py-2 text-sm text-white shadow">${message}</p></div>` : null}
         <main className="mx-auto max-w-3xl px-4 py-5">${contenu}</main>
-        <footer className="mx-auto max-w-3xl px-4 pb-8 pt-2 text-center text-xs text-slate-500">
-          <p>MVP · Sprint 1 · données de démonstration enregistrées dans ce navigateur</p>
-          <button type="button" className="mt-1 underline" onClick=${reinitialiser}>Réinitialiser les données de démo</button>
-        </footer>
+        ${onglet === 'sorties' && vue === 'accueil'
+          ? html`<footer className="mx-auto max-w-3xl px-4 pt-2 text-center text-xs text-slate-500">
+              <p>MVP · données de démonstration enregistrées dans ce navigateur</p>
+              <button type="button" className="mt-1 underline" onClick=${reinitialiser}>Réinitialiser les données de démo</button>
+            </footer>`
+          : null}
+        <div className="h-24" aria-hidden="true"></div>
+        <${BarreOnglets} actif=${onglet} onChoisir=${choisirOnglet} />
       </div>`;
   }
 
