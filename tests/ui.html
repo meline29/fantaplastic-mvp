@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <title>Test du parcours – sprint 1</title>
+  <title>Test du parcours dans l'appli</title>
   <style>
     body { font-family: system-ui, sans-serif; margin: 16px; background: #F6F1E7; color: #0B2A4A; display: flex; gap: 24px; }
     iframe { width: 375px; height: 760px; border: 1px solid #999; background: #fff; }
@@ -12,7 +12,7 @@
 <body>
   <iframe id="app"></iframe>
   <div>
-    <h1>Parcours bénévole – sprint 1</h1>
+    <h1>Parcours dans l'appli – sprints 1 et 2</h1>
     <p id="resume">Test en cours…</p>
     <ol id="etapes"></ol>
   </div>
@@ -38,7 +38,7 @@
       var win = this.contentWindow, doc = win.document;
       function texte() { return doc.body.innerText; }
       function bouton(libelle) {
-        return Array.from(doc.querySelectorAll('button')).find(function (b) { return b.textContent.trim() === libelle; });
+        return Array.from(doc.querySelectorAll('button')).find(function (b) { return b.textContent.replace(/[‹›+]/g, '').trim() === libelle; });
       }
       function saisir(label, valeur) {
         var champ = Array.from(doc.querySelectorAll('label')).find(function (l) { return l.textContent.indexOf(label) === 0; }).querySelector('input');
@@ -53,6 +53,16 @@
         noter('US3 – 4 sorties à venir affichées', doc.querySelectorAll('main li').length === 4);
         noter('US3 – une sortie affichée "Complet"', texte().indexOf('Complet') !== -1);
         noter('US3 – places restantes affichées', /\d+ places restantes/.test(texte()));
+
+        // US4 : un clic sur une sortie montre le matériel
+        doc.querySelector('main li button').click();
+        await attendreQue(function () { return texte().indexOf('Ce que tu apportes') !== -1; });
+        noter('US4 – un clic sur une sortie ouvre son détail', !!doc.querySelector('main h1') && doc.querySelector('main h1').textContent.indexOf('Moulin Blanc') !== -1);
+        noter('US4 – les objets à apporter par le bénévole sont indiqués', texte().indexOf('Ce que tu apportes') !== -1 && texte().indexOf('Gants de jardinage') !== -1);
+        noter('US4 – les objets apportés par l\'asso sont indiqués', texte().indexOf('Ce que l\'asso apporte') !== -1 && texte().indexOf('Pinces de ramassage') !== -1);
+        bouton('Toutes les sorties').click();
+        await attendreQue(function () { return doc.querySelectorAll('main li').length === 4; });
+        noter('US4 – retour à la liste des sorties', doc.querySelectorAll('main li').length === 4);
 
         bouton('Je crée mon compte').click();
         await attendreQue(function () { return !!doc.querySelector('form'); });

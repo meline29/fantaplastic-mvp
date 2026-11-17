@@ -1,5 +1,5 @@
 /*
- * fantaPLASTIC – écrans du MVP (sprint 1)
+ * fantaPLASTIC – écrans du MVP (sprints 1 et 2)
  * React sans étape de build : on écrit les composants avec htm (équivalent du JSX).
  */
 (function () {
@@ -20,6 +20,13 @@
     return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }).replace(':', 'h');
   }
 
+  // 90 -> "1 h 30", 120 -> "2 h", 45 -> "45 min"
+  function duree(minutes) {
+    var h = Math.floor(minutes / 60), m = minutes % 60;
+    if (!h) return m + ' min';
+    return h + ' h' + (m ? ' ' + (m < 10 ? '0' + m : m) : '');
+  }
+
   // ---------- petits éléments ----------
 
   function IconePin() {
@@ -28,6 +35,10 @@
 
   function IconeHorloge() {
     return html`<svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`;
+  }
+
+  function IconeChevron() {
+    return html`<svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6"/></svg>`;
   }
 
   function BadgePlaces(props) {
@@ -43,19 +54,24 @@
 
   // ---------- US3 : liste des prochaines sorties ----------
 
+  // Toute la carte est cliquable et ouvre le détail de la sortie (US4)
   function CarteSortie(props) {
     var s = props.sortie;
     var debut = new Date(s.date_debut);
     var fin = new Date(debut.getTime() + s.duree_min * 60000);
     return html`
-      <li className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-marine/10">
-        <div className="flex items-start justify-between gap-3">
-          <p className="text-sm font-semibold text-lagon-fonce">${majuscule(formatJour.format(debut))}</p>
-          <${BadgePlaces} restantes=${s.places_restantes} />
-        </div>
-        <h3 className="mt-1 text-lg font-bold leading-snug text-marine">${s.titre}</h3>
-        <p className="mt-2 flex items-center gap-2 text-sm text-slate-600"><${IconeHorloge} /> ${heure(debut)} – ${heure(fin)}</p>
-        <p className="mt-1 flex items-center gap-2 text-sm text-slate-600"><${IconePin} /> ${s.lieu}, ${s.commune}</p>
+      <li>
+        <button type="button" onClick=${function () { props.onOuvrir(s.id); }}
+          className="block w-full rounded-2xl bg-white p-4 text-left shadow-sm ring-1 ring-marine/10 transition hover:ring-2 hover:ring-lagon focus:outline-none focus-visible:ring-2 focus-visible:ring-lagon">
+          <span className="flex items-start justify-between gap-3">
+            <span className="text-sm font-semibold text-lagon-fonce">${majuscule(formatJour.format(debut))}</span>
+            <${BadgePlaces} restantes=${s.places_restantes} />
+          </span>
+          <span className="mt-1 block text-lg font-bold leading-snug text-marine">${s.titre}</span>
+          <span className="mt-2 flex items-center gap-2 text-sm text-slate-600"><${IconeHorloge} /> ${heure(debut)} – ${heure(fin)}</span>
+          <span className="mt-1 flex items-center gap-2 text-sm text-slate-600"><${IconePin} /> ${s.lieu}, ${s.commune}</span>
+          <span className="mt-3 flex items-center gap-1 text-sm font-semibold text-lagon-fonce">Voir le matériel <${IconeChevron} /></span>
+        </button>
       </li>`;
   }
 
@@ -67,7 +83,74 @@
     if (sorties.length === 0) {
       return html`<p className="rounded-2xl bg-white p-6 text-center text-slate-600 ring-1 ring-marine/10">Aucune sortie prévue pour l'instant. Reviens bientôt !</p>`;
     }
-    return html`<ul className="space-y-3">${sorties.map(function (s) { return html`<${CarteSortie} key=${s.id} sortie=${s} />`; })}</ul>`;
+    return html`<ul className="space-y-3">${sorties.map(function (s) { return html`<${CarteSortie} key=${s.id} sortie=${s} onOuvrir=${props.onOuvrir} />`; })}</ul>`;
+  }
+
+  // ---------- US4 : détail d'une sortie avec le matériel ----------
+
+  function ListeMateriel(props) {
+    if (!props.objets.length) {
+      return html`<p className="mt-3 text-sm text-slate-500">${props.siVide}</p>`;
+    }
+    return html`
+      <ul className="mt-3 space-y-2">
+        ${props.objets.map(function (objet, i) {
+          return html`<li key=${i} className="flex items-start gap-2.5 text-slate-800">
+            <span aria-hidden="true" className=${'mt-2 h-2 w-2 shrink-0 rounded-full ' + props.puce}></span>${objet}
+          </li>`;
+        })}
+      </ul>`;
+  }
+
+  function DetailSortie(props) {
+    var _s = useState(undefined), s = _s[0], setS = _s[1];
+
+    useEffect(function () {
+      db.obtenirSortie(props.id).then(setS);
+    }, [props.id]);
+
+    var retour = html`
+      <button type="button" className="flex items-center gap-1 text-sm font-semibold text-lagon-fonce hover:underline" onClick=${props.onRetour}>
+        <span aria-hidden="true">‹</span> Toutes les sorties
+      </button>`;
+
+    if (s === undefined) {
+      return html`<div>${retour}<p className="py-8 text-center text-slate-500">Chargement…</p></div>`;
+    }
+    if (s === null) {
+      return html`<div>${retour}<p className="mt-4 rounded-2xl bg-white p-6 text-center text-slate-600 ring-1 ring-marine/10">Cette sortie n'existe plus.</p></div>`;
+    }
+
+    var debut = new Date(s.date_debut);
+    var fin = new Date(debut.getTime() + s.duree_min * 60000);
+    return html`
+      <article>
+        ${retour}
+        <section className="mt-3 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-marine/10">
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-sm font-semibold text-lagon-fonce">${majuscule(formatJour.format(debut))}</p>
+            <${BadgePlaces} restantes=${s.places_restantes} />
+          </div>
+          <h1 className="mt-1 text-2xl font-extrabold leading-tight text-marine">${s.titre}</h1>
+          <p className="mt-3 flex items-center gap-2 text-slate-700"><${IconeHorloge} /> ${heure(debut)} – ${heure(fin)} (${duree(s.duree_min)})</p>
+          <p className="mt-1 flex items-center gap-2 text-slate-700"><${IconePin} /> ${s.lieu}, ${s.commune}</p>
+          <p className="mt-3 text-sm text-slate-500">
+            ${s.nb_inscrits} inscrit${s.nb_inscrits > 1 ? 's' : ''} sur ${s.places} places${s.organisateur_prenom ? ' · organisée par ' + s.organisateur_prenom : ''}
+          </p>
+        </section>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-marine/10">
+            <h2 className="text-lg font-bold text-marine">Ce que tu apportes</h2>
+            <p className="text-sm text-slate-500">À prévoir par chaque bénévole</p>
+            <${ListeMateriel} objets=${s.materiel_a_apporter} puce="bg-soleil" siVide="Rien de spécial à prévoir." />
+          </section>
+          <section className="rounded-2xl bg-lagon/15 p-5">
+            <h2 className="text-lg font-bold text-marine">Ce que l'asso apporte</h2>
+            <p className="text-sm text-slate-600">Prêté ou fourni sur place</p>
+            <${ListeMateriel} objets=${s.materiel_fourni} puce="bg-lagon-fonce" siVide="L'asso n'apporte rien de particulier pour cette sortie." />
+          </section>
+        </div>
+      </article>`;
   }
 
   // ---------- US15 : créer un compte / se connecter ----------
@@ -253,6 +336,7 @@
     var _o = useState('sorties'), onglet = _o[0], setOnglet = _o[1];
     var _s = useState(null), sorties = _s[0], setSorties = _s[1];
     var _m = useState(''), message = _m[0], setMessage = _m[1];
+    var _d = useState(null), sortieOuverte = _d[0], setSortieOuverte = _d[1];
 
     function chargerSorties() {
       db.listerSortiesAVenir().then(setSorties);
@@ -291,6 +375,17 @@
       window.scrollTo(0, 0);
     }
 
+    function ouvrirSortie(id) {
+      setSortieOuverte(id);
+      setVue('detail');
+      window.scrollTo(0, 0);
+    }
+
+    function retourAuxSorties() {
+      setVue('accueil');
+      window.scrollTo(0, 0);
+    }
+
     function reinitialiser() {
       db.reinitialiser().then(function () {
         setUtilisateur(null);
@@ -309,6 +404,8 @@
         onBasculer=${function () { setVue(vue === 'connexion' ? 'inscription' : 'connexion'); }}
         onAnnuler=${function () { setVue('accueil'); }}
       />`;
+    } else if (vue === 'detail') {
+      contenu = html`<${DetailSortie} key=${sortieOuverte} id=${sortieOuverte} onRetour=${retourAuxSorties} />`;
     } else if (onglet === 'sorties') {
       contenu = html`
         <div>
@@ -329,7 +426,7 @@
                 </button>
               </section>`}
           <h2 className="mb-3 mt-6 text-lg font-bold text-marine">Prochaines sorties</h2>
-          <${ListeSorties} sorties=${sorties} />
+          <${ListeSorties} sorties=${sorties} onOuvrir=${ouvrirSortie} />
         </div>`;
     } else {
       var infos = ONGLETS.find(function (o) { return o.id === onglet; });

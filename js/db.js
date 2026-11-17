@@ -1,5 +1,5 @@
 /*
- * fantaPLASTIC – couche de données (sprint 1)
+ * fantaPLASTIC – couche de données (sprints 1 et 2)
  *
  * Version "démo locale" : les données sont rangées dans le navigateur (localStorage).
  * Les fonctions ont la même forme (async) que celles qu'on aura avec Supabase,
@@ -71,11 +71,16 @@
       var maintenant = new Date().toISOString();
       var orga = { id: 'orga-demo', prenom: 'Asso (démo)', email: 'orga@demo.local', role: 'organisateur', created_at: maintenant };
       var modeles = [
-        { titre: 'Ramassage à la plage du Moulin Blanc', lieu: 'Plage du Moulin Blanc', commune: 'Brest', j: 3, h: 10, m: 0, duree: 120, places: 25, inscrits: 18, lat: 48.3925, lng: -4.4330, fourni: 'Sacs et pinces', apporter: 'Gants, chaussures fermées' },
-        { titre: "Nettoyage de l'anse de Sainte-Anne-du-Portzic", lieu: 'Anse de Sainte-Anne-du-Portzic', commune: 'Brest', j: 6, h: 14, m: 0, duree: 90, places: 15, inscrits: 15, lat: 48.3590, lng: -4.5510, fourni: 'Sacs', apporter: 'Gants, bottes' },
-        { titre: 'Grève du Dellec', lieu: 'Plage du Dellec', commune: 'Plouzané', j: 10, h: 9, m: 30, duree: 120, places: 20, inscrits: 17, lat: 48.3555, lng: -4.5680, fourni: 'Sacs, pinces, gants', apporter: 'Bottes, une gourde' },
-        { titre: 'Ramassage au port du Tinduff', lieu: 'Port du Tinduff', commune: 'Plougastel-Daoulas', j: 14, h: 10, m: 0, duree: 150, places: 30, inscrits: 2, lat: 48.3355, lng: -4.3720, fourni: 'Sacs et pinces', apporter: 'Gants, bottes' },
-        { titre: 'Ramassage au Relecq-Kerhuon', lieu: 'Plage du Passage', commune: 'Le Relecq-Kerhuon', j: -5, h: 10, m: 0, duree: 120, places: 20, inscrits: 12, lat: 48.4040, lng: -4.3950, fourni: 'Sacs', apporter: 'Gants' }
+        { titre: 'Ramassage à la plage du Moulin Blanc', lieu: 'Plage du Moulin Blanc', commune: 'Brest', j: 3, h: 10, m: 0, duree: 120, places: 25, inscrits: 18, lat: 48.3925, lng: -4.4330,
+          fourni: ['Sacs poubelle', 'Pinces de ramassage', 'Seaux pour le tri'], apporter: ['Gants de jardinage', 'Chaussures fermées', 'Une gourde'] },
+        { titre: "Nettoyage de l'anse de Sainte-Anne-du-Portzic", lieu: 'Anse de Sainte-Anne-du-Portzic', commune: 'Brest', j: 6, h: 14, m: 0, duree: 90, places: 15, inscrits: 15, lat: 48.3590, lng: -4.5510,
+          fourni: ['Sacs poubelle', 'Gants'], apporter: ['Bottes', 'Un coupe-vent'] },
+        { titre: 'Grève du Dellec', lieu: 'Plage du Dellec', commune: 'Plouzané', j: 10, h: 9, m: 30, duree: 120, places: 20, inscrits: 17, lat: 48.3555, lng: -4.5680,
+          fourni: ['Sacs poubelle', 'Pinces de ramassage', 'Gants'], apporter: ['Bottes', 'Une gourde', 'Des vêtements chauds'] },
+        { titre: 'Ramassage au port du Tinduff', lieu: 'Port du Tinduff', commune: 'Plougastel-Daoulas', j: 14, h: 10, m: 0, duree: 150, places: 30, inscrits: 2, lat: 48.3355, lng: -4.3720,
+          fourni: ['Sacs poubelle', 'Pinces de ramassage', 'Une brouette pour les gros déchets'], apporter: ['Gants', 'Bottes', 'Un en-cas'] },
+        { titre: 'Ramassage au Relecq-Kerhuon', lieu: 'Plage du Passage', commune: 'Le Relecq-Kerhuon', j: -5, h: 10, m: 0, duree: 120, places: 20, inscrits: 12, lat: 48.4040, lng: -4.3950,
+          fourni: ['Sacs poubelle'], apporter: ['Gants'] }
       ];
       var sorties = [];
       var inscriptions = [];
@@ -107,6 +112,27 @@
 
     function sauver() {
       ecrire(CLE_DB, cache);
+    }
+
+    // Le matériel est rangé sous forme de liste : ['Sacs', 'Pinces']. On accepte aussi un texte
+    // "Sacs, pinces" (saisie du formulaire, ou données enregistrées avant le sprint 2).
+    function enListe(valeur) {
+      var morceaux = Array.isArray(valeur) ? valeur : String(valeur || '').split(/[,;\n]/);
+      return morceaux
+        .map(function (x) { return String(x).trim(); })
+        .filter(function (x) { return x.length > 0; })
+        .map(function (x) { return x.charAt(0).toUpperCase() + x.slice(1); });
+    }
+
+    // Ajoute à une sortie ce que l'écran affiche : nombre d'inscrits, places restantes, matériel en liste
+    function enrichir(s, d) {
+      var nb = d.inscriptions.filter(function (i) { return i.sortie_id === s.id; }).length;
+      return Object.assign({}, s, {
+        materiel_fourni: enListe(s.materiel_fourni),
+        materiel_a_apporter: enListe(s.materiel_a_apporter),
+        nb_inscrits: nb,
+        places_restantes: Math.max(0, s.places - nb)
+      });
     }
 
     function profilPublic(p) {
@@ -176,10 +202,17 @@
       return d.sorties
         .filter(function (s) { return s.statut !== 'annulee' && new Date(s.date_debut).getTime() >= maintenant; })
         .sort(function (a, b) { return new Date(a.date_debut) - new Date(b.date_debut); })
-        .map(function (s) {
-          var nb = d.inscriptions.filter(function (i) { return i.sortie_id === s.id; }).length;
-          return Object.assign({}, s, { nb_inscrits: nb, places_restantes: Math.max(0, s.places - nb) });
-        });
+        .map(function (s) { return enrichir(s, d); });
+    }
+
+    // ---------- US4 : détail d'une sortie (avec le matériel) ----------
+
+    async function obtenirSortie(id) {
+      var d = donnees();
+      var s = d.sorties.find(function (x) { return x.id === id; });
+      if (!s) return null;
+      var orga = d.profiles.find(function (p) { return p.id === s.organisateur_id; });
+      return Object.assign(enrichir(s, d), { organisateur_prenom: orga ? orga.prenom : null });
     }
 
     // Remet les données de démo à zéro (pratique avant une revue de sprint)
@@ -203,6 +236,7 @@
       deconnecter: deconnecter,
       utilisateurCourant: utilisateurCourant,
       listerSortiesAVenir: listerSortiesAVenir,
+      obtenirSortie: obtenirSortie,
       reinitialiser: reinitialiser,
       _effacer: _effacer
     };

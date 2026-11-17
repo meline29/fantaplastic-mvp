@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tests sprint 1</title>
+  <title>Tests de la couche de données</title>
   <style>
     body { font-family: system-ui, sans-serif; margin: 24px; background: #F6F1E7; color: #0B2A4A; }
     li { margin: 4px 0; }
@@ -12,7 +12,7 @@
   </style>
 </head>
 <body>
-  <h1>Tests de la couche de données – sprint 1</h1>
+  <h1>Tests de la couche de données – sprints 1 et 2</h1>
   <p id="resume">Tests en cours…</p>
   <ul id="liste"></ul>
 
@@ -46,6 +46,14 @@
       noter('US3 – les sorties sont triées par date', triee);
       noter('US3 – places restantes = places - inscrits', sorties.every(function (s) { return s.places_restantes === Math.max(0, s.places - s.nb_inscrits); }));
       noter('US3 – une sortie pleine affiche 0 place restante', sorties.some(function (s) { return s.places_restantes === 0; }));
+
+      // US4
+      noter('US4 – chaque sortie a sa liste de matériel (asso et bénévoles)', sorties.every(function (s) { return Array.isArray(s.materiel_fourni) && Array.isArray(s.materiel_a_apporter); }));
+      var detail = await db.obtenirSortie(sorties[0].id);
+      noter('US4 – le détail d\'une sortie donne ce que le bénévole apporte', detail && detail.materiel_a_apporter.indexOf('Gants de jardinage') !== -1, detail && detail.materiel_a_apporter.join(', '));
+      noter('US4 – le détail d\'une sortie donne ce que l\'asso apporte', detail && detail.materiel_fourni.indexOf('Pinces de ramassage') !== -1, detail && detail.materiel_fourni.join(', '));
+      noter('US4 – le détail indique l\'organisateur et les places', detail.organisateur_prenom === 'Asso (démo)' && detail.places_restantes === sorties[0].places_restantes);
+      noter('US4 – une sortie inconnue renvoie null', (await db.obtenirSortie('n-existe-pas')) === null);
 
       // US15
       noter('US15 – personne n\'est connecté au départ', (await db.utilisateurCourant()) === null);
