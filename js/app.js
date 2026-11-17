@@ -230,6 +230,7 @@
           placeholder=${props.placeholder}
           inputMode=${props.inputMode}
           list=${props.list}
+          onBlur=${props.onBlur}
         />
         ${props.aide ? html`<span className="mt-1 block text-xs text-slate-500">${props.aide}</span>` : null}
       </label>`;
@@ -369,9 +370,45 @@
     var _p = useState('20'), places = _p[0], setPlaces = _p[1];
     var _a = useState(''), apporter = _a[0], setApporter = _a[1];
     var _f = useState(''), fourni = _f[0], setFourni = _f[1];
-    var _pt = useState(null), point = _pt[0], setPoint = _pt[1]; // US6 : { lat, lng } du rendez-vous
+    var _pt = useState(null), point = _pt[0], setPoint = _pt[1]; // US6 : { lat, lng, source } du rendez-vous
+    var _ce = useState(null), centre = _ce[0], setCentre = _ce[1];
+    var _lo = useState(''), localisation = _lo[0], setLocalisation = _lo[1]; // '', recherche, trouve, introuvable, erreur
+    var _ln = useState(''), lieuTrouve = _ln[0], setLieuTrouve = _ln[1];
     var _err = useState(''), erreur = _err[0], setErreur = _err[1];
     var _env = useState(false), envoi = _env[0], setEnvoi = _env[1];
+    var derniereRecherche = React.useRef('');
+
+    // US6 : placer le point tout seul d'après le lieu et la commune (quand on quitte un de ces champs).
+    // Un point posé à la main n'est jamais écrasé, sauf si on clique sur « Localiser le lieu ».
+    function localiser(force) {
+      var l = lieu.trim(), c = commune.trim();
+      if (!l || !c) return;
+      var cle = (l + '|' + c).toLowerCase();
+      if (!force && (cle === derniereRecherche.current || (point && point.source === 'manuel'))) return;
+      derniereRecherche.current = cle;
+      setLocalisation('recherche');
+      window.FantaCarte.chercherLieu(l, c).then(function (r) {
+        if (derniereRecherche.current !== cle) return; // une recherche plus récente a été lancée
+        if (r.point) {
+          setPoint({ lat: r.point.lat, lng: r.point.lng, source: 'auto' });
+          setLieuTrouve(r.point.nom);
+          setLocalisation('trouve');
+        } else {
+          if (r.commune) setCentre({ lat: r.commune.lat, lng: r.commune.lng });
+          setLocalisation('introuvable');
+        }
+      }).catch(function () {
+        if (derniereRecherche.current === cle) setLocalisation('erreur');
+      });
+    }
+
+    var aideCarte;
+    if (point && point.source === 'manuel') aideCarte = 'Point placé à la main. Tu peux le faire glisser pour l’ajuster.';
+    else if (localisation === 'recherche') aideCarte = 'Recherche du lieu sur la carte…';
+    else if (point && localisation === 'trouve') aideCarte = 'Point placé automatiquement (' + lieuTrouve + '). Vérifie-le, et fais-le glisser si besoin.';
+    else if (localisation === 'introuvable') aideCarte = 'Lieu introuvable automatiquement : touche la carte à l’endroit du rendez-vous.';
+    else if (localisation === 'erreur') aideCarte = 'La recherche automatique ne répond pas : touche la carte à l’endroit du rendez-vous.';
+    else aideCarte = 'Le point se place tout seul d’après le lieu et la commune. Tu peux aussi toucher la carte.';
 
     async function valider(e) {
       e.preventDefault();
@@ -399,10 +436,13 @@
         <p className="mt-1 text-sm text-slate-600">Elle apparaîtra tout de suite dans la liste des bénévoles.</p>
         <form className="mt-5 space-y-4" onSubmit=${valider} noValidate=${true}>
           <${Champ} label="Titre de la sortie" value=${titre} onChange=${setTitre} maxLength=${80} placeholder="Ex. : Ramassage au Moulin Blanc" />
-          <${Champ} label="Lieu de rendez-vous" value=${lieu} onChange=${setLieu} placeholder="Ex. : Parking du Moulin Blanc" />
-          <${Champ} label="Commune" value=${commune} onChange=${setCommune} list="communes-rade" placeholder="Ex. : Brest" />
+          <${Champ} label="Lieu de rendez-vous" value=${lieu} onChange=${setLieu} placeholder="Ex. : Plage du Moulin Blanc"
+            onBlur=${function () { localiser(false); }} />
+          <${Champ} label="Commune" value=${commune} onChange=${setCommune} list="communes-rade" placeholder="Ex. : Brest"
+            onBlur=${function () { localiser(false); }} />
           <datalist id="communes-rade">${COMMUNES.map(function (c) { return html`<option key=${c} value=${c} />`; })}</datalist>
-          <${window.FantaCarte.ChoixPoint} value=${point} onChange=${setPoint} />
+          <${window.FantaCarte.ChoixPoint} value=${point} onChange=${setPoint} centre=${centre} message=${aideCarte}
+            onLocaliser=${lieu.trim() && commune.trim() ? function () { localiser(true); } : null} />
           <div className="grid grid-cols-2 gap-3">
             <${Champ} label="Date" type="date" value=${jour} onChange=${setJour} min=${dateLocale(new Date())} />
             <${Champ} label="Heure" type="time" value=${heureDebut} onChange=${setHeureDebut} />

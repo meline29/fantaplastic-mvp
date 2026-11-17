@@ -104,6 +104,13 @@
         noter('US2 – en organisateur, le bouton « Créer une sortie » est là', !!bouton('Créer une sortie'));
         bouton('Créer une sortie').click();
         await attendreQue(function () { return texte().indexOf('Nouvelle sortie') !== -1; });
+        // US6 : la recherche en ligne (OpenStreetMap / Base Adresse Nationale) est remplacée par une
+        // réponse fixe, pour que le test ne dépende pas d'internet et n'envoie rien à ces services.
+        var recherches = [];
+        win.FantaCarte.chercherLieu = function (l, c) {
+          recherches.push(l + ', ' + c);
+          return Promise.resolve({ point: { lat: 48.39667, lng: -4.38414, nom: 'Plage du passage, Keralas' } });
+        };
         bouton('Publier la sortie').click();
         await attendreQue(function () { return !!doc.querySelector('[role=alert]'); });
         noter('US2 – formulaire vide : message d\'erreur', !!doc.querySelector('[role=alert]') && doc.querySelector('[role=alert]').textContent.indexOf('titre') !== -1);
@@ -123,9 +130,18 @@
         bouton('Publier la sortie').click();
         await attendreQue(function () { return !!doc.querySelector('[role=alert]') && doc.querySelector('[role=alert]').textContent.indexOf('point de rendez-vous') !== -1; });
         noter('US6 – sans point sur la carte : message d\'erreur', !!doc.querySelector('[role=alert]') && doc.querySelector('[role=alert]').textContent.indexOf('point de rendez-vous') !== -1);
+        var champCommune = Array.from(doc.querySelectorAll('label')).find(function (l) { return l.textContent.indexOf('Commune') === 0; }).querySelector('input');
+        champCommune.dispatchEvent(new win.FocusEvent('focusout', { bubbles: true }));
+        await attendreQue(function () { return !!doc.querySelector('main .leaflet-marker-icon') && texte().indexOf('Point placé automatiquement') !== -1; });
+        noter('US6 – en quittant « Commune », le point se place tout seul d\'après le lieu',
+          !!doc.querySelector('main .leaflet-marker-icon') && texte().indexOf('Point placé automatiquement') !== -1 && recherches[0] === 'Plage du Passage, Le Relecq-Kerhuon',
+          recherches.join(' / '));
+        champCommune.dispatchEvent(new win.FocusEvent('focusout', { bubbles: true }));
+        await attendre(300);
+        noter('US6 – pas de nouvelle recherche si le lieu n\'a pas changé', recherches.length === 1, recherches.length + ' recherche(s)');
         bouton('Placer au centre de la carte').click();
-        await attendreQue(function () { return !!doc.querySelector('main .leaflet-marker-icon'); });
-        noter('US6 – le point de rendez-vous est placé sur la carte', !!doc.querySelector('main .leaflet-marker-icon') && texte().indexOf('Point placé') !== -1);
+        await attendreQue(function () { return texte().indexOf('Point placé à la main') !== -1; });
+        noter('US6 – on peut corriger le point à la main', texte().indexOf('Point placé à la main') !== -1);
         bouton('Publier la sortie').click();
         await attendreQue(function () { return !!doc.querySelector('main h1') && doc.querySelector('main h1').textContent === 'Nettoyage de la grève de Kerhuon'; });
         noter('US2 – la sortie est publiée et sa fiche s\'ouvre', !!doc.querySelector('main h1') && doc.querySelector('main h1').textContent === 'Nettoyage de la grève de Kerhuon');

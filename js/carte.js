@@ -160,7 +160,84 @@
       </section>`;
   }
 
+  // ---------- localiser automatiquement un lieu (géocodage) ----------
+  // On essaie, dans l'ordre, jusqu'à trouver :
+  //   1) OpenStreetMap (Nominatim) avec « lieu, commune »  → trouve les plages, ports, phares…
+  //   2) OpenStreetMap avec le lieu seul, autour de la rade (la commune doit apparaître dans le résultat)
+  //   3) la Base Adresse Nationale (Géoplateforme de l'IGN) → trouve les vraies adresses (rue, numéro)
+  // Sinon, on renvoie seulement le centre de la commune pour y amener la carte.
+  // Règles de Nominatim : 1 requête par seconde au plus, et pas de recherche à chaque frappe.
+  // On ne cherche donc que quand l'organisateur quitte le champ, avec une pause entre deux appels.
+
+  var ZONE = { sud: 47.9, nord: 48.75, ouest: -5.2, est: -3.9 }; // même zone que regles.js
+  var dejaCherche = {};
+  var dernierAppelOsm = 0;
+
+  function dansLaZone(lat, lng) {
+    return lat >= ZONE.sud && lat <= ZONE.nord && lng >= ZONE.ouest && lng <= ZONE.est;
+  }
+
+  function simplifier(t) {
+    return String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[-']/g, ' ').trim();
+  }
+
+  async function chercherOsm(q, communeAttendue) {
+    var attente = dernierAppelOsm + 1100 - Date.now();
+    if (attente > 0) await new Promise(function (r) { setTimeout(r, attente); });
+    dernierAppelOsm = Date.now();
+    var reponse = await fetch('https://nominatim.openstreetmap.org/search?' + new URLSearchParams({
+      q: q, format: 'jsonv2', countrycodes: 'fr', limit: '1', 'accept-language': 'fr',
+      viewbox: [ZONE.ouest, ZONE.nord, ZONE.est, ZONE.sud].join(','), bounded: '1'
+    }));
+    if (!reponse.ok) throw new Error('OpenStreetMap ' + reponse.status);
+    var r = (await reponse.json())[0];
+    if (!r) return null;
+    if (communeAttendue && simplifier(r.display_name).indexOf(simplifier(communeAttendue)) === -1) return null;
+    var lat = Number(r.lat), lng = Number(r.lon);
+    if (!dansLaZone(lat, lng)) return null;
+    return { lat: arrondi(lat), lng: arrondi(lng), nom: r.display_name.split(',').slice(0, 2).join(',').trim() };
+  }
+
+  async function chercherAdresse(q, type) {
+    var parametres = { q: q, limit: '1', lat: '48.35', lon: '-4.45' };
+    if (type) parametres.type = type;
+    var reponse = await fetch('https://data.geopf.fr/geocodage/search?' + new URLSearchParams(parametres));
+    if (!reponse.ok) throw new Error('Base Adresse Nationale ' + reponse.status);
+    var f = ((await reponse.json()).features || [])[0];
+    if (!f || f.properties.score < 0.5) return null;
+    var lng = f.geometry.coordinates[0], lat = f.geometry.coordinates[1];
+    if (!dansLaZone(lat, lng)) return null;
+    return { lat: arrondi(lat), lng: arrondi(lng), nom: f.properties.label };
+  }
+
+  // Renvoie { point: {lat, lng, nom} }, ou { commune: {lat, lng} }, ou {} si rien trouvé.
+  async function chercherLieu(lieu, commune) {
+    lieu = String(lieu || '').trim();
+    commune = String(commune || '').trim();
+    var cle = simplifier(lieu + '|' + commune);
+    if (dejaCherche[cle]) return dejaCherche[cle];
+    var essais = [
+      function () { return chercherOsm(lieu + ', ' + commune); },
+      function () { return chercherOsm(lieu, commune); },
+      function () { return chercherAdresse(lieu + ' ' + commune); }
+    ];
+    var pannes = 0;
+    for (var i = 0; i < essais.length; i++) {
+      try {
+        var point = await essais[i]();
+        if (point) return (dejaCherche[cle] = { point: point });
+      } catch (e) { pannes++; }
+    }
+    var centre = null;
+    try { centre = await chercherAdresse(commune, 'municipality'); } catch (e) { pannes++; }
+    if (pannes === essais.length + 1) throw new Error('La recherche automatique ne répond pas.');
+    return (dejaCherche[cle] = centre ? { commune: centre } : {});
+  }
+
   // ---------- formulaire de création : placer le point de rendez-vous ----------
+  // props.value  : { lat, lng, source: 'auto' | 'manuel' } ou null
+  // props.centre : { lat, lng } où amener la carte (commune trouvée, sans point précis)
+  // props.message, props.onLocaliser : texte d'aide et bouton « Localiser le lieu »
 
   function ChoixPoint(props) {
     var conteneur = useRef(null);
@@ -169,29 +246,39 @@
     var changerRef = useRef(props.onChange);
     changerRef.current = props.onChange;
 
-    function placer(latlng) {
-      var carte = carteRef.current;
-      if (!carte) return;
-      if (!pinRef.current) {
-        pinRef.current = L.marker(latlng, { icon: icone(COULEURS.choix), draggable: true, title: 'Point de rendez-vous' }).addTo(carte);
-        pinRef.current.on('dragend', function () {
-          var p = pinRef.current.getLatLng();
-          changerRef.current({ lat: arrondi(p.lat), lng: arrondi(p.lng) });
-        });
-      } else {
-        pinRef.current.setLatLng(latlng);
-      }
-      changerRef.current({ lat: arrondi(latlng.lat), lng: arrondi(latlng.lng) });
+    function poserAlaMain(latlng) {
+      changerRef.current({ lat: arrondi(latlng.lat), lng: arrondi(latlng.lng), source: 'manuel' });
     }
 
     useEffect(function () {
       if (!leafletOk) return undefined;
       var carte = nouvelleCarte(conteneur.current);
-      carte.on('click', function (e) { placer(e.latlng); });
+      carte.on('click', function (e) { poserAlaMain(e.latlng); });
       carteRef.current = carte;
       var t = setTimeout(function () { carte.invalidateSize(); }, 150);
       return function () { clearTimeout(t); carte.remove(); carteRef.current = null; pinRef.current = null; };
     }, []);
+
+    // L'épingle suit le point choisi (à la main ou trouvé automatiquement)
+    useEffect(function () {
+      var carte = carteRef.current, v = props.value;
+      if (!carte) return;
+      if (!v) {
+        if (pinRef.current) { pinRef.current.remove(); pinRef.current = null; }
+        return;
+      }
+      if (!pinRef.current) {
+        pinRef.current = L.marker([v.lat, v.lng], { icon: icone(COULEURS.choix), draggable: true, title: 'Point de rendez-vous' }).addTo(carte);
+        pinRef.current.on('dragend', function () { poserAlaMain(pinRef.current.getLatLng()); });
+      } else {
+        pinRef.current.setLatLng([v.lat, v.lng]);
+      }
+      if (v.source === 'auto') carte.setView([v.lat, v.lng], 15);
+    }, [props.value]);
+
+    useEffect(function () {
+      if (carteRef.current && props.centre) carteRef.current.setView([props.centre.lat, props.centre.lng], 13);
+    }, [props.centre]);
 
     if (!leafletOk) return html`<${CarteIndisponible} />`;
 
@@ -201,17 +288,18 @@
         <div className="isolate mt-1 overflow-hidden rounded-xl ring-1 ring-slate-300">
           <div ref=${conteneur} style=${{ height: '240px' }}></div>
         </div>
-        <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-          <span className="text-xs text-slate-500">
-            ${props.value ? 'Point placé. Tu peux le faire glisser pour l’ajuster.' : 'Touche la carte à l’endroit du rendez-vous.'}
-          </span>
+        <p className="mt-1 text-xs text-slate-500" aria-live="polite">${props.message}</p>
+        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+          ${props.onLocaliser
+            ? html`<button type="button" className="text-xs font-semibold text-lagon-fonce underline" onClick=${props.onLocaliser}>Localiser le lieu</button>`
+            : null}
           <button type="button" className="text-xs font-semibold text-lagon-fonce underline"
-            onClick=${function () { if (carteRef.current) placer(carteRef.current.getCenter()); }}>
+            onClick=${function () { if (carteRef.current) poserAlaMain(carteRef.current.getCenter()); }}>
             Placer au centre de la carte
           </button>
         </div>
       </div>`;
   }
 
-  window.FantaCarte = { CarteSorties: CarteSorties, ChoixPoint: ChoixPoint };
+  window.FantaCarte = { CarteSorties: CarteSorties, ChoixPoint: ChoixPoint, chercherLieu: chercherLieu };
 })();

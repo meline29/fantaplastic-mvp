@@ -75,10 +75,12 @@ Toujours pas fait : le branchement sur Supabase (T2) et l'inscription à une sor
 | Élément | Points (TD1) | État |
 |---|---|---|
 | US14 – S'inscrire à une sortie | 2 | Fait : bouton « Je m'inscris » sur la fiche, puis **formulaire de sécurité** obligatoire. Désinscription possible. Pas d'inscription en double ni sur une sortie complète. |
-| US6 – Carte des rendez-vous | 3 | Fait : onglet **Carte** avec un point par sortie à venir (vert : places libres, jaune : 3 places ou moins, rouge : complet). Un clic sur un point ouvre une bulle, puis « Voir la sortie » ouvre la fiche. À la création, l'organisateur place le point de rendez-vous sur une petite carte (obligatoire, autour de la rade de Brest). |
+| US6 – Carte des rendez-vous | 3 | Fait : onglet **Carte** avec un point par sortie à venir (vert : places libres, jaune : 3 places ou moins, rouge : complet). Un clic sur un point ouvre une bulle, puis « Voir la sortie » ouvre la fiche. À la création, le point de rendez-vous **se place tout seul** d'après le lieu et la commune (recherche sur OpenStreetMap, puis dans la Base Adresse Nationale) ; l'organisateur le vérifie et peut le déplacer ou le poser à la main. Point obligatoire, autour de la rade de Brest. |
 | T2 / T3 – Base de données et déploiement | 4 + 5 | Fait : base Supabase et site en ligne sur Vercel (voir plus bas). |
 
 Les sorties créées avant la carte n'ont pas de point : elles sont listées sous la carte, dans « Pas encore sur la carte ».
+
+La recherche automatique n'envoie que le lieu et la commune tapés (par exemple « Plage du Dellec, Plouzané ») aux services OpenStreetMap (Nominatim) et IGN (Géoplateforme), rien sur la personne. Elle ne se lance que quand on quitte le champ, pas à chaque lettre, comme le demandent les règles d'utilisation de Nominatim.
 
 Le **formulaire de sécurité** s'affiche au moment de l'inscription :
 - les risques auxquels le bénévole s'expose : **blessure, coupure, chute**, avec les bons réflexes ;
