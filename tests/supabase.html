@@ -84,7 +84,7 @@
 
         // Requêtes de l'onglet Profil : en visiteur elles ne renvoient rien, mais elles doivent être valides
         var historique = await sb.from('inscriptions').select('created_at, sortie:sorties(id, titre, date_debut, statut)').limit(1);
-        noter('la requête de l'historique du profil est valide', !historique.error, historique.error ? historique.error.message : '');
+        noter("la requête de l'historique du profil est valide", !historique.error, historique.error ? historique.error.message : '');
         var compte = await sb.from('signalements').select('id', { count: 'exact', head: true });
         noter('le comptage des signalements du profil est valide', !compte.error, compte.error ? compte.error.message : '');
 
