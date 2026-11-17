@@ -48,7 +48,9 @@
   }
 
   function nouvelleCarte(element) {
-    var carte = L.map(element, { scrollWheelZoom: true }).setView(CENTRE_RADE, ZOOM_RADE);
+    // Pas de zoom à la molette : sinon, sur ordinateur, la carte « avale » le défilement de la page.
+    // On zoome avec les boutons + / −, un double-clic, ou deux doigts sur téléphone.
+    var carte = L.map(element, { scrollWheelZoom: false }).setView(CENTRE_RADE, ZOOM_RADE);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">les contributeurs OpenStreetMap</a>'
