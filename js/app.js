@@ -89,8 +89,37 @@
       </label>`;
   }
 
+  var ROLES = [
+    { valeur: 'benevole', titre: 'Bénévole', detail: 'Je participe aux ramassages' },
+    { valeur: 'organisateur', titre: 'Organisateur', detail: "J'organise des sorties pour l'asso" }
+  ];
+
+  function nomRole(role) {
+    var r = ROLES.find(function (x) { return x.valeur === role; });
+    return r ? r.titre : role;
+  }
+
+  function ChoixRole(props) {
+    return html`
+      <fieldset>
+        <legend className="text-sm font-medium text-marine">Je suis</legend>
+        <div className="mt-1 grid grid-cols-2 gap-2">
+          ${ROLES.map(function (o) {
+            var actif = props.value === o.valeur;
+            return html`
+              <label key=${o.valeur} className=${'cursor-pointer rounded-xl border-2 p-3 transition focus-within:ring-2 focus-within:ring-lagon/40 ' + (actif ? 'border-lagon bg-lagon/10' : 'border-slate-200 bg-white hover:border-slate-300')}>
+                <input type="radio" name="role" value=${o.valeur} checked=${actif} onChange=${function () { props.onChange(o.valeur); }} className="sr-only" />
+                <span className="block font-semibold text-marine">${o.titre}</span>
+                <span className="mt-0.5 block text-xs text-slate-600">${o.detail}</span>
+              </label>`;
+          })}
+        </div>
+      </fieldset>`;
+  }
+
   function FormulaireCompte(props) {
     var inscription = props.mode === 'inscription';
+    var _r = useState('benevole'), role = _r[0], setRole = _r[1];
     var _p = useState(''), prenom = _p[0], setPrenom = _p[1];
     var _e = useState(''), email = _e[0], setEmail = _e[1];
     var _m = useState(''), motDePasse = _m[0], setMotDePasse = _m[1];
@@ -103,7 +132,7 @@
       setEnvoi(true);
       try {
         var profil = inscription
-          ? await db.inscrire({ prenom: prenom, email: email, motDePasse: motDePasse })
+          ? await db.inscrire({ role: role, prenom: prenom, email: email, motDePasse: motDePasse })
           : await db.connecter({ email: email, motDePasse: motDePasse });
         props.onConnecte(profil, inscription);
       } catch (err) {
@@ -114,11 +143,12 @@
 
     return html`
       <section className="mx-auto max-w-md rounded-2xl bg-white p-6 shadow-sm ring-1 ring-marine/10">
-        <h2 className="text-xl font-bold text-marine">${inscription ? 'Créer mon compte bénévole' : 'Me connecter'}</h2>
+        <h2 className="text-xl font-bold text-marine">${inscription ? 'Créer mon compte' : 'Me connecter'}</h2>
         <p className="mt-1 text-sm text-slate-600">
           ${inscription ? "Ça prend moins d'une minute, promis." : 'Content de te revoir !'}
         </p>
         <form className="mt-5 space-y-4" onSubmit=${valider} noValidate=${true}>
+          ${inscription ? html`<${ChoixRole} value=${role} onChange=${setRole} />` : null}
           ${inscription ? html`<${Champ} label="Prénom" value=${prenom} onChange=${setPrenom} autoComplete="given-name" />` : null}
           <${Champ} label="Email" type="email" value=${email} onChange=${setEmail} autoComplete="email" />
           <${Champ}
@@ -189,7 +219,9 @@
     function connecte(profil, nouveau) {
       setUtilisateur(profil);
       setVue('accueil');
-      setMessage(nouveau ? 'Bienvenue ' + profil.prenom + ', ton compte est créé !' : 'Bonjour ' + profil.prenom + ' !');
+      setMessage(nouveau
+        ? 'Bienvenue ' + profil.prenom + ', ton compte ' + nomRole(profil.role).toLowerCase() + ' est créé !'
+        : 'Bonjour ' + profil.prenom + ' !');
     }
 
     function deconnexion() {
@@ -223,7 +255,10 @@
         <div>
           ${utilisateur
             ? html`<section className="rounded-2xl bg-lagon/15 p-5">
-                <p className="text-lg font-bold text-marine">Bonjour ${utilisateur.prenom} 👋</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-lg font-bold text-marine">Bonjour ${utilisateur.prenom} 👋</p>
+                  <span className="rounded-full bg-marine px-2.5 py-0.5 text-xs font-semibold text-white">${nomRole(utilisateur.role)}</span>
+                </div>
                 <p className="mt-1 text-sm text-slate-700">Voici les prochaines sorties de ramassage dans la rade.</p>
               </section>`
             : html`<section className="rounded-2xl bg-marine p-6 text-white">
@@ -231,7 +266,7 @@
                 <h1 className="mt-2 text-2xl font-extrabold leading-tight">Un océan sans plastique, c'est fantaplastic !</h1>
                 <p className="mt-2 text-white/80">Trouve une sortie de ramassage près de chez toi, de Plouzané à Plougastel-Daoulas.</p>
                 <button type="button" className="mt-4 rounded-xl bg-soleil px-4 py-2.5 font-semibold text-marine hover:bg-soleil/90" onClick=${function () { setVue('inscription'); }}>
-                  Créer mon compte bénévole
+                  Je crée mon compte
                 </button>
               </section>`}
           <h2 className="mb-3 mt-6 text-lg font-bold text-marine">Prochaines sorties</h2>

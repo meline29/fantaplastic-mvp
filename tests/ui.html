@@ -48,15 +48,22 @@
       }
 
       try {
-        await attendreQue(function () { return doc.querySelectorAll('li').length > 0; });
+        await attendreQue(function () { return doc.querySelectorAll('main li').length > 0; });
 
         noter('US3 – 4 sorties à venir affichées', doc.querySelectorAll('main li').length === 4);
         noter('US3 – une sortie affichée "Complet"', texte().indexOf('Complet') !== -1);
         noter('US3 – places restantes affichées', /\d+ places restantes/.test(texte()));
 
-        bouton('Créer mon compte bénévole').click();
+        bouton('Je crée mon compte').click();
         await attendreQue(function () { return !!doc.querySelector('form'); });
         noter('US15 – le formulaire de création de compte s\'ouvre', !!doc.querySelector('form'));
+
+        var radios = doc.querySelectorAll('input[name=role]');
+        noter('US15 – on peut choisir bénévole ou organisateur', radios.length === 2);
+        noter('US15 – « Bénévole » est coché par défaut', doc.querySelector('input[name=role][value=benevole]').checked);
+        doc.querySelector('input[name=role][value=organisateur]').closest('label').click();
+        await attendreQue(function () { return doc.querySelector('input[name=role][value=organisateur]').checked; });
+        noter('US15 – on peut sélectionner « Organisateur »', doc.querySelector('input[name=role][value=organisateur]').checked);
 
         saisir('Prénom', 'Lou');
         saisir('Email', 'lou@exemple.fr');
@@ -70,6 +77,7 @@
         await attendreQue(function () { return !!bouton('Déconnexion'); });
         noter('US15 – compte créé et connecté (bouton Déconnexion)', !!bouton('Déconnexion'));
         noter('US15 – message de bienvenue avec le prénom', texte().indexOf('Bienvenue Lou') !== -1);
+        noter('US15 – le compte créé est bien organisateur', texte().indexOf('compte organisateur est créé') !== -1 && texte().indexOf('Organisateur') !== -1);
         noter('US3 – la liste reste visible une fois connecté', doc.querySelectorAll('main li').length === 4);
 
         bouton('Déconnexion').click();

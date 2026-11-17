@@ -47,13 +47,20 @@ create table public.signalements (
 );
 
 -- ---------- Création automatique du profil à l'inscription (US15) ----------
--- L'appli envoie le prénom dans les métadonnées : supabase.auth.signUp({ email, password, options: { data: { prenom } } })
+-- L'appli envoie le prénom et le rôle choisi dans les métadonnées :
+--   supabase.auth.signUp({ email, password, options: { data: { prenom, role } } })
+-- MVP : le rôle "organisateur" se choisit à l'inscription. Plus tard, il devra être
+-- validé par l'asso (TD2, risque R7 et article 6 du contrat). "admin" ne se choisit jamais.
 
 create or replace function public.creer_profil()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
-  insert into public.profiles (id, prenom)
-  values (new.id, coalesce(nullif(trim(new.raw_user_meta_data ->> 'prenom'), ''), 'Bénévole'));
+  insert into public.profiles (id, prenom, role)
+  values (
+    new.id,
+    coalesce(nullif(trim(new.raw_user_meta_data ->> 'prenom'), ''), 'Bénévole'),
+    case when new.raw_user_meta_data ->> 'role' = 'organisateur' then 'organisateur' else 'benevole' end
+  );
   return new;
 end;
 $$;

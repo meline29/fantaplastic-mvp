@@ -10,6 +10,8 @@
   'use strict';
 
   var EMAIL_OK = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  // Rôles qu'on peut choisir soi-même en créant son compte (admin : jamais)
+  var ROLES_INSCRIPTION = ['benevole', 'organisateur'];
 
   function creerDB(options) {
     var prefixe = (options && options.prefixe) || 'fantaplastic';
@@ -121,7 +123,9 @@
       var prenom = String((champs && champs.prenom) || '').trim();
       var email = String((champs && champs.email) || '').trim().toLowerCase();
       var motDePasse = String((champs && champs.motDePasse) || '');
+      var role = (champs && champs.role) || 'benevole';
 
+      if (ROLES_INSCRIPTION.indexOf(role) === -1) throw new Error('Choisis si tu es bénévole ou organisateur.');
       if (!prenom) throw new Error('Indique ton prénom.');
       if (prenom.length > 40) throw new Error('Ton prénom doit faire 40 caractères maximum.');
       if (!EMAIL_OK.test(email)) throw new Error("L'adresse email n'est pas valide.");
@@ -131,7 +135,7 @@
       var existe = d.profiles.some(function (p) { return p.email === email; });
       if (existe) throw new Error('Un compte existe déjà avec cet email. Connecte-toi plutôt.');
 
-      var profil = { id: nouvelId(), prenom: prenom, email: email, role: 'benevole', created_at: new Date().toISOString() };
+      var profil = { id: nouvelId(), prenom: prenom, email: email, role: role, created_at: new Date().toISOString() };
       var sel = nouvelId();
       d.profiles.push(profil);
       d.comptes.push({ profil_id: profil.id, sel: sel, empreinte: await hacher(motDePasse, sel) });

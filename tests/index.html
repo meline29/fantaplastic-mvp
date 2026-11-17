@@ -60,6 +60,11 @@
       await doitEchouer('US15 – mot de passe trop court refusé', db.inscrire({ prenom: 'Al', email: 'al@b.fr', motDePasse: '1234' }), '8 caractères');
 
       await db.deconnecter();
+      var orga = await db.inscrire({ role: 'organisateur', prenom: 'Yann', email: 'yann@exemple.fr', motDePasse: 'motdepasse2' });
+      noter('US15 – on peut créer un compte organisateur', orga.role === 'organisateur');
+      await doitEchouer('US15 – rôle admin refusé à l\'inscription', db.inscrire({ role: 'admin', prenom: 'Al', email: 'admin@b.fr', motDePasse: '12345678' }), 'bénévole ou organisateur');
+
+      await db.deconnecter();
       noter('US15 – déconnexion', (await db.utilisateurCourant()) === null);
       await doitEchouer('US15 – mauvais mot de passe refusé', db.connecter({ email: 'lou@exemple.fr', motDePasse: 'faux-mdp-123' }), 'incorrect');
       await doitEchouer('US15 – email inconnu refusé', db.connecter({ email: 'inconnu@exemple.fr', motDePasse: 'motdepasse1' }), 'incorrect');
