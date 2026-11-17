@@ -57,6 +57,7 @@
         bouton('Je crée mon compte').click();
         await attendreQue(function () { return !!doc.querySelector('form'); });
         noter('US15 – le formulaire de création de compte s\'ouvre', !!doc.querySelector('form'));
+        noter('US15 – la phrase grise « données de démonstration » est en bas', !!doc.querySelector('footer') && doc.querySelector('footer').textContent.indexOf('données de démonstration') !== -1);
 
         var radios = doc.querySelectorAll('input[name=role]');
         noter('US15 – on peut choisir bénévole ou organisateur', radios.length === 2);

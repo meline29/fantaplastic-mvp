@@ -346,7 +346,7 @@
         />
         ${message ? html`<div role="status" className="mx-auto mt-3 max-w-3xl px-4"><p className="rounded-xl bg-marine px-4 py-2 text-sm text-white shadow">${message}</p></div>` : null}
         <main className="mx-auto max-w-3xl px-4 py-5">${contenu}</main>
-        ${onglet === 'sorties' && vue === 'accueil'
+        ${onglet === 'sorties' || vue !== 'accueil'
           ? html`<footer className="mx-auto max-w-3xl px-4 pt-2 text-center text-xs text-slate-500">
               <p>MVP · données de démonstration enregistrées dans ce navigateur</p>
               <button type="button" className="mt-1 underline" onClick=${reinitialiser}>Réinitialiser les données de démo</button>
