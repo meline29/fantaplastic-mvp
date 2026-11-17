@@ -9,7 +9,7 @@ Application web (PWA) pour les bénévoles ramasseurs de la rade de Brest.
 - **Deux modes :** si `js/config.js` contient l'URL et la clé Supabase, l'appli utilise la vraie base. Sinon, ou si on ajoute `?mode=local` à l'adresse, elle tourne en **démo locale** (données dans le navigateur, bascule « Démo · rôle » et remise à zéro disponibles).
 
 Les tests s'ouvrent de la même façon (ils tournent toujours sur la démo locale) :
-- `tests/index.html` : 70 tests de la couche de données (comptes, rôles, liste et fiche des sorties, création d'une sortie avec son point de rendez-vous, matériel de sécurité, inscription, signalements, badges et score de fidélité) ;
+- `tests/index.html` : 71 tests de la couche de données (comptes, rôles, liste et fiche des sorties, création d'une sortie avec son point de rendez-vous, matériel de sécurité, inscription, signalements, badges et score de fidélité) ;
 - `tests/ui.html` : rejoue le parcours dans l'appli, en 63 étapes (sorties, fiche d'une sortie, création de compte organisateur, création d'une sortie avec son point sur la carte, bascule de rôle, formulaire de sécurité et inscription, carte des sorties, signalement avec photo et accord pour la localisation, profil et badges, connexion). La position GPS et la recherche de lieux y sont simulées. **Attention, il remet les données de démo à zéro.**
 - `tests/supabase.html` : vérifie la base en ligne, en lecture seule (config remplie, script SQL exécuté, règles d'accès qui bloquent un visiteur).
 
@@ -103,6 +103,11 @@ Le **formulaire de sécurité** s'affiche au moment de l'inscription :
 Une fois inscrit, la fiche rappelle de signaler tout incident à l'asso.
 
 **Matériel de sécurité :** l'asso fournit toujours des **gilets jaunes** et une **trousse de premiers secours**. Ils sont ajoutés automatiquement en tête de « Ce que l'asso apporte » pour chaque sortie (contrainte équivalente dans `supabase/schema.sql`).
+
+## Comptes de démo (pour montrer les badges)
+
+- **Démo locale** (https://fantaplastic-mvp.vercel.app/?mode=local) : compte bénévole fictif **Nolwenn (démo)**, identifiant `demo@fantaplastic.fr`, mot de passe `Sardine-Plastic-29`. Il a 23 ramassages passés (Sardine Plastic, Cabillaud Bouteille et Poulpe Bouchon débloqués) et une sortie à venir. Ce compte n'existe que dans la démo locale (données dans le navigateur), pas dans la vraie base : son mot de passe peut donc être écrit ici.
+- **Vrai site** : le script `supabase/demo-historique-gertrude.sql` ajoute 23 ramassages passés, marqués « (démo) », au compte de test « Gertrude ». On se connecte avec le mot de passe choisi à la création de ce compte. Pour tout retirer : `delete from public.sorties where titre like '% (démo)';`
 
 ## Mise en ligne (GitHub + Supabase + Vercel)
 

@@ -197,6 +197,15 @@
       await db.deconnecter();
       await doitEchouer('Profil – il faut être connecté', db.monProfil(), 'Connecte-toi');
 
+      // Compte de démo (identifiant et mot de passe dans le README)
+      var demo = await db.connecter({ email: 'demo@fantaplastic.fr', motDePasse: 'Sardine-Plastic-29' });
+      var profilDemo = await db.monProfil();
+      noter('Compte démo – connexion, 23 ramassages : Sardine, Cabillaud et Poulpe, et une sortie à venir',
+        demo.prenom === 'Nolwenn (démo)' && profilDemo.bilan.nbRamassages === 23
+          && obtenus(profilDemo.bilan) === 'Sardine Plastic, Cabillaud Bouteille, Poulpe Bouchon' && profilDemo.aVenir.length === 1,
+        profilDemo.bilan.score + ' points, ' + obtenus(profilDemo.bilan));
+      await db.deconnecter();
+
       db._effacer();
       document.getElementById('resume').textContent = nbOk + ' test(s) OK, ' + nbKo + ' en échec';
       document.getElementById('resume').className = nbKo ? 'ko' : 'ok';

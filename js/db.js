@@ -97,6 +97,48 @@
       return { profiles: [orga], comptes: [], sorties: sorties, inscriptions: inscriptions, signalements: [] };
     }
 
+    // Faux compte de démo, avec déjà 23 ramassages passés, pour montrer le profil et les badges
+    // pendant les revues. Identifiant : demo@fantaplastic.fr (mot de passe dans le README).
+    // Comme pour les autres comptes de la démo, seule l'empreinte du mot de passe est gardée.
+    var COMPTE_DEMO = {
+      id: 'demo-nolwenn', prenom: 'Nolwenn (démo)', email: 'demo@fantaplastic.fr', role: 'benevole',
+      sel: 'demo-sel-nolwenn-2026', empreinte: 'bf3defd098638de042ecbf6ed2cc78bd02e5635bed5a1d302fc858488f674a61'
+    };
+
+    function ajouterCompteDemo(d) {
+      if (d.profiles.some(function (p) { return p.id === COMPTE_DEMO.id || p.email === COMPTE_DEMO.email; })) return false;
+      var membreDepuis = new Date();
+      membreDepuis.setMonth(membreDepuis.getMonth() - 8);
+      d.profiles.push({ id: COMPTE_DEMO.id, prenom: COMPTE_DEMO.prenom, email: COMPTE_DEMO.email, role: COMPTE_DEMO.role, created_at: membreDepuis.toISOString() });
+      d.comptes.push({ profil_id: COMPTE_DEMO.id, sel: COMPTE_DEMO.sel, empreinte: COMPTE_DEMO.empreinte });
+      var lieux = [
+        ['Plage du Moulin Blanc', 'Brest', 48.3925, -4.4330], ['Plage du Dellec', 'Plouzané', 48.3555, -4.5680],
+        ['Port du Tinduff', 'Plougastel-Daoulas', 48.3355, -4.3720], ['Plage du Passage', 'Le Relecq-Kerhuon', 48.4040, -4.3950]
+      ];
+      // 23 ramassages, environ un tous les 9 jours sur les 7 derniers mois → Sardine, Cabillaud et Poulpe
+      for (var k = 1; k <= 23; k++) {
+        var l = lieux[k % lieux.length];
+        var date = new Date();
+        date.setDate(date.getDate() - (9 * k + 4));
+        date.setHours(10, 0, 0, 0);
+        var s = {
+          id: nouvelId(), titre: 'Ramassage – ' + l[0], lieu: l[0], commune: l[1],
+          date_debut: date.toISOString(), duree_min: 120, places: 20,
+          materiel_fourni: R.avecSecurite(['Sacs poubelle']), materiel_a_apporter: ['Gants'],
+          lat: l[2], lng: l[3], statut: 'prevue', organisateur_id: 'orga-demo', created_at: date.toISOString()
+        };
+        d.sorties.push(s);
+        d.inscriptions.push({ id: nouvelId(), sortie_id: s.id, benevole_id: COMPTE_DEMO.id, securite_acceptee_le: date.toISOString(), created_at: date.toISOString() });
+      }
+      // Et inscrite à une prochaine sortie
+      var prochaine = d.sorties.find(function (s) { return s.titre === 'Ramassage au port du Tinduff' && new Date(s.date_debut) > new Date(); });
+      if (prochaine) {
+        var maintenant = new Date().toISOString();
+        d.inscriptions.push({ id: nouvelId(), sortie_id: prochaine.id, benevole_id: COMPTE_DEMO.id, securite_acceptee_le: maintenant, created_at: maintenant });
+      }
+      return true;
+    }
+
     function donnees() {
       if (!cache) {
         cache = lire(CLE_DB);
@@ -105,6 +147,7 @@
           ecrire(CLE_DB, cache);
         }
         if (!cache.signalements) cache.signalements = []; // données enregistrées avant les signalements
+        if (ajouterCompteDemo(cache)) ecrire(CLE_DB, cache); // aussi pour les navigateurs qui avaient déjà la démo
       }
       return cache;
     }
