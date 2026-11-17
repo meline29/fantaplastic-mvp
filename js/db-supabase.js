@@ -171,6 +171,52 @@
     return obtenirSortie(sortieId);
   }
 
+  // ---------- US1 / US16 : signalements (photo dans le stockage privé « signalements ») ----------
+  // Les photos ne sont pas publiques : on les affiche avec des liens temporaires (1 h),
+  // réservés aux comptes connectés (règles de supabase/schema.sql).
+
+  var BUCKET = 'signalements';
+
+  async function avecPhotos(lignes) {
+    if (!lignes.length) return [];
+    var liens = {};
+    var r = await sb.storage.from(BUCKET).createSignedUrls(lignes.map(function (l) { return l.photo_url; }), 3600);
+    if (!r.error && r.data) r.data.forEach(function (x) { if (x.signedUrl) liens[x.path] = x.signedUrl; });
+    return lignes.map(function (l) {
+      return { id: l.id, lat: l.lat, lng: l.lng, precision_m: l.precision_m, commentaire: l.commentaire, created_at: l.created_at, photo: liens[l.photo_url] || null };
+    });
+  }
+
+  async function creerSignalement(champs) {
+    var moi = await profilCourant();
+    if (!moi) throw new Error('Connecte-toi pour signaler un endroit pollué.');
+    var s = R.validerSignalement(champs);
+    var id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now());
+    var chemin = moi.id + '/' + id + '.jpg'; // chacun range ses photos dans son propre dossier
+    var envoi = await sb.storage.from(BUCKET).upload(chemin, s.photo, { contentType: s.photo.type || 'image/jpeg', upsert: false });
+    if (envoi.error) {
+      console.error('Stockage :', envoi.error);
+      throw new Error("La photo n'a pas pu être envoyée. Vérifie ta connexion et réessaie.");
+    }
+    var r = await sb.from('signalements').insert({
+      auteur_id: moi.id, photo_url: chemin, lat: s.lat, lng: s.lng, precision_m: s.precision_m, commentaire: s.commentaire
+    }).select('id, lat, lng, precision_m, commentaire, created_at, photo_url').single();
+    if (r.error) {
+      await sb.storage.from(BUCKET).remove([chemin]); // on ne laisse pas de photo orpheline
+      throw traduire(r.error);
+    }
+    return (await avecPhotos([r.data]))[0];
+  }
+
+  async function listerSignalements() {
+    if (!(await sessionCourante())) return [];
+    var lignes = verifier(await sb.from('signalements')
+      .select('id, lat, lng, precision_m, commentaire, created_at, photo_url')
+      .order('created_at', { ascending: false })
+      .limit(200));
+    return avecPhotos(lignes);
+  }
+
   // Pas de bascule de rôle ni de remise à zéro ici : ce sont des outils de la démo locale.
   window.FantaDB = {
     mode: 'supabase',
@@ -183,6 +229,8 @@
     creerSortie: creerSortie,
     inscrireASortie: inscrireASortie,
     desinscrireDeSortie: desinscrireDeSortie,
+    creerSignalement: creerSignalement,
+    listerSignalements: listerSignalements,
     materielSecurite: R.MATERIEL_SECURITE.slice()
   };
 })();

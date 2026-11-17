@@ -646,6 +646,27 @@
       chargerSorties();
     }, []);
 
+    // US16 : les déchets signalés ne sont visibles qu'une fois connecté
+    var _sg = useState(null), signalements = _sg[0], setSignalements = _sg[1];
+    var _sv = useState(null), signalementVu = _sv[0], setSignalementVu = _sv[1];
+    var idUtilisateur = utilisateur ? utilisateur.id : null;
+
+    function chargerSignalements() {
+      if (!idUtilisateur) { setSignalements([]); return; }
+      db.listerSignalements().then(setSignalements).catch(function () { setSignalements([]); });
+    }
+
+    useEffect(chargerSignalements, [idUtilisateur]);
+
+    function signalementEnvoye(signalement) {
+      setSignalements(function (avant) { return [signalement].concat(avant || []); });
+      setSignalementVu(signalement.id);
+      setOnglet('carte');
+      setVue('accueil');
+      window.scrollTo(0, 0);
+      setMessage('Merci ! Ton signalement est sur la carte.');
+    }
+
     useEffect(function () {
       if (!message) return undefined;
       var t = setTimeout(function () { setMessage(''); }, 4000);
@@ -677,10 +698,13 @@
     function choisirOnglet(id) {
       setOnglet(id);
       setVue('accueil');
+      setSignalementVu(null);
+      if (id === 'carte') chargerSignalements(); // liens des photos renouvelés (ils expirent au bout d'1 h)
       window.scrollTo(0, 0);
     }
 
     function ouvrirSortie(id) {
+      setSignalementVu(null);
       setSortieOuverte(id);
       setVue('detail');
       window.scrollTo(0, 0);
@@ -768,7 +792,11 @@
           <${ListeSorties} sorties=${sorties} erreur=${erreurSorties} onReessayer=${chargerSorties} onOuvrir=${ouvrirSortie} />
         </div>`;
     } else if (onglet === 'carte') {
-      contenu = html`<${window.FantaCarte.CarteSorties} sorties=${sorties} erreur=${erreurSorties} onOuvrir=${ouvrirSortie} />`;
+      contenu = html`<${window.FantaCarte.CarteSorties} sorties=${sorties} erreur=${erreurSorties} onOuvrir=${ouvrirSortie}
+        connecte=${!!utilisateur} signalements=${signalements} signalementVu=${signalementVu} />`;
+    } else if (onglet === 'signaler') {
+      contenu = html`<${window.FantaSignaler.OngletSignaler} utilisateur=${utilisateur}
+        onSeConnecter=${seConnecter} onCreerCompte=${function () { setVue('inscription'); }} onEnvoye=${signalementEnvoye} />`;
     } else {
       var infos = ONGLETS.find(function (o) { return o.id === onglet; });
       contenu = html`<${OngletVide} titre=${infos.titre} />`;

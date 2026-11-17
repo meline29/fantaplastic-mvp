@@ -47,6 +47,49 @@
     });
   }
 
+  // US16 : marqueur rond corail avec un appareil photo, pour les déchets signalés
+  function iconeSignalement() {
+    return L.divIcon({
+      className: 'pin-fanta pin-signalement',
+      html: '<svg viewBox="0 0 30 30" width="30" height="30" aria-hidden="true">' +
+        '<circle cx="15" cy="15" r="13" fill="#E8503F" stroke="#fff" stroke-width="2"/>' +
+        '<path d="M9 12.5a1.5 1.5 0 0 1 1.5-1.5h1.5l1-1.5h4l1 1.5h1.5a1.5 1.5 0 0 1 1.5 1.5v6a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 9 18.5z" fill="none" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/>' +
+        '<circle cx="15" cy="15.5" r="2.2" fill="none" stroke="#fff" stroke-width="1.6"/></svg>',
+      iconSize: [30, 30],
+      iconAnchor: [15, 15],
+      popupAnchor: [0, -14]
+    });
+  }
+
+  function dateHeure(iso) {
+    var d = new Date(iso);
+    return formatJour.format(d) + ' à ' + heure(d);
+  }
+
+  // Bulle d'un signalement : la photo, la date, le commentaire (textContent, jamais du HTML)
+  function contenuBulleSignalement(s) {
+    var bloc = document.createElement('div');
+    bloc.className = 'bulle-sortie';
+    if (s.photo) {
+      var img = document.createElement('img');
+      img.className = 'bulle-photo';
+      img.alt = 'Photo des déchets signalés';
+      img.src = s.photo;
+      bloc.appendChild(img);
+    }
+    function ligne(classe, texte) {
+      var p = document.createElement('p');
+      p.className = classe;
+      p.textContent = texte;
+      bloc.appendChild(p);
+    }
+    ligne('bulle-date', 'Déchets signalés le ' + dateHeure(s.created_at));
+    if (s.commentaire) ligne('bulle-commentaire', s.commentaire);
+    if (!s.photo) ligne('bulle-lieu', 'Photo indisponible pour le moment.');
+    if (s.precision_m) ligne('bulle-lieu', 'Position à ± ' + s.precision_m + ' m');
+    return bloc;
+  }
+
   function nouvelleCarte(element) {
     // Pas de zoom à la molette : sinon, sur ordinateur, la carte « avale » le défilement de la page.
     // On zoome avec les boutons + / −, un double-clic, ou deux doigts sur téléphone.
@@ -109,6 +152,8 @@
       return function () { clearTimeout(t); carte.remove(); carteRef.current = null; };
     }, []);
 
+    var signalements = props.signalements || [];
+
     useEffect(function () {
       var carte = carteRef.current;
       if (!carte) return;
@@ -119,15 +164,31 @@
           .addTo(coucheRef.current);
         return [s.lat, s.lng];
       });
-      if (points.length > 1) carte.fitBounds(points, { padding: [40, 40], maxZoom: 13 });
+      // US16 : les déchets signalés (seulement pour les comptes connectés)
+      var cible = null;
+      signalements.forEach(function (sig) {
+        var m = L.marker([sig.lat, sig.lng], { icon: iconeSignalement(), title: 'Déchets signalés le ' + dateHeure(sig.created_at), riseOnHover: true })
+          .bindPopup(function () { return contenuBulleSignalement(sig); }, { minWidth: 220, maxWidth: 240 })
+          .addTo(coucheRef.current);
+        if (sig.id === props.signalementVu) cible = m;
+        points.push([sig.lat, sig.lng]);
+      });
+      if (cible) {
+        // On arrive juste après un envoi : on montre la photo à son emplacement
+        carte.setView(cible.getLatLng(), 16);
+        cible.openPopup();
+      } else if (points.length > 1) carte.fitBounds(points, { padding: [40, 40], maxZoom: 13 });
       else if (points.length === 1) carte.setView(points[0], 13);
-    }, [props.sorties]);
+    }, [props.sorties, props.signalements, props.signalementVu]);
 
+    var morceaux = [];
+    if (props.sorties !== null) {
+      morceaux.push(placees.length + ' sortie' + (placees.length > 1 ? 's' : '') + ' à venir');
+      if (props.connecte) morceaux.push(signalements.length + ' signalement' + (signalements.length > 1 ? 's' : '') + ' de déchets');
+    }
     var resume = props.sorties === null
       ? 'Chargement des sorties…'
-      : placees.length === 0
-        ? 'Aucune sortie à venir sur la carte pour le moment.'
-        : placees.length + ' sortie' + (placees.length > 1 ? 's' : '') + ' à venir. Touche un point pour voir la sortie.';
+      : morceaux.join(' · ') + '. Touche un point pour en savoir plus.';
 
     return html`
       <section>
@@ -143,7 +204,11 @@
           <li className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full" style=${{ background: COULEURS.libre }}></span>Places libres</li>
           <li className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full" style=${{ background: COULEURS.presque }}></span>3 places ou moins</li>
           <li className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full" style=${{ background: COULEURS.complet }}></span>Complet</li>
+          ${props.connecte
+            ? html`<li className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full ring-2 ring-white" style=${{ background: '#E8503F' }}></span>Déchets signalés</li>`
+            : null}
         </ul>
+        ${props.connecte ? null : html`<p className="mt-1 text-xs text-slate-500">Connecte-toi pour voir aussi les déchets signalés par les bénévoles.</p>`}
         ${sansPoint.length
           ? html`<div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-marine/10">
               <h2 className="font-semibold text-marine">Pas encore sur la carte</h2>

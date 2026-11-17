@@ -117,7 +117,35 @@
     }
   }
 
+  // ---------- US1 : signaler un endroit pollué (photo + position GPS prise à l'envoi) ----------
+
+  var PHOTO_MAX_OCTETS = 5 * 1024 * 1024;
+
+  function validerSignalement(champs) {
+    champs = champs || {};
+    var photo = champs.photo;
+    if (!photo || typeof photo.size !== 'number' || photo.size === 0) throw new Error('Prends une photo des déchets.');
+    if (photo.type && !/^image\/(jpeg|png|webp)$/.test(photo.type)) throw new Error('La photo doit être une image (JPEG, PNG ou WebP).');
+    if (photo.size > PHOTO_MAX_OCTETS) throw new Error('La photo est trop lourde (5 Mo maximum).');
+    var lat = nombreOuNaN(champs.lat);
+    var lng = nombreOuNaN(champs.lng);
+    if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      throw new Error("Ta position n'a pas pu être trouvée. Vérifie que la localisation est activée et réessaie.");
+    }
+    var commentaire = String(champs.commentaire || '').trim();
+    if (commentaire.length > 280) throw new Error('Le commentaire doit faire 280 caractères maximum.');
+    var precision = nombreOuNaN(champs.precision_m);
+    return {
+      photo: photo,
+      lat: Math.round(lat * 100000) / 100000,
+      lng: Math.round(lng * 100000) / 100000,
+      precision_m: isNaN(precision) ? null : Math.round(precision),
+      commentaire: commentaire || null
+    };
+  }
+
   window.FantaRegles = {
+    validerSignalement: validerSignalement,
     MATERIEL_SECURITE: MATERIEL_SECURITE,
     enListe: enListe,
     avecSecurite: avecSecurite,

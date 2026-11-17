@@ -74,6 +74,14 @@
         noter('un visiteur ne voit aucun profil', !!profils.error || profils.data.length === 0,
           profils.error ? profils.error.message : profils.data.length + ' profil(s) visible(s)');
 
+        var signalements = await sb.from('signalements').select('id');
+        noter('un visiteur ne voit aucun signalement', !!signalements.error || signalements.data.length === 0,
+          signalements.error ? signalements.error.message : signalements.data.length + ' signalement(s) visible(s)');
+
+        var photo = await sb.storage.from('signalements').upload('visiteur/essai.jpg', new Blob([new Uint8Array([255, 216, 255])], { type: 'image/jpeg' }));
+        noter('un visiteur ne peut pas envoyer de photo (stockage privé)', !!photo.error && !/not found/i.test(photo.error.message),
+          photo.error ? photo.error.message : 'la photo a été envoyée !');
+
         var inscriptions = await sb.from('inscriptions').select('id');
         noter('un visiteur ne voit aucune inscription', !!inscriptions.error || inscriptions.data.length === 0,
           inscriptions.error ? inscriptions.error.message : inscriptions.data.length + ' inscription(s) visible(s)');

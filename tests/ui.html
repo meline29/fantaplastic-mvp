@@ -196,7 +196,42 @@
         await attendreQue(function () { return doc.querySelectorAll('main .leaflet-marker-icon').length === 5; });
         noter('US6 – « Retour à la carte » ramène sur la carte', doc.querySelectorAll('main .leaflet-marker-icon').length === 5);
 
-        var titres = { Signaler: 'Signaler un endroit pollué', Profil: 'Mon profil' };
+        // US1 : signaler des déchets (connecté)
+        bouton('Signaler').click();
+        await attendreQue(function () { return !!doc.querySelector('main input[type=file]'); });
+        var champPhoto = doc.querySelector('main input[type=file]');
+        noter('US1 – connecté, l\'onglet Signaler ouvre l\'appareil photo', !!champPhoto && champPhoto.getAttribute('accept') === 'image/*' && champPhoto.getAttribute('capture') === 'environment');
+        // La position GPS est simulée, et on compte combien de fois elle est demandée
+        var demandesPosition = 0;
+        win.FantaSignaler.obtenirPosition = function () {
+          demandesPosition++;
+          return Promise.resolve({ lat: 48.38013, lng: -4.48765, precision_m: 9 });
+        };
+        bouton('Envoyer le signalement').click();
+        await attendreQue(function () { return !!doc.querySelector('[role=alert]'); });
+        noter('US1 – sans photo : message d\'erreur, et aucune position demandée', !!doc.querySelector('[role=alert]') && doc.querySelector('[role=alert]').textContent.indexOf('photo') !== -1 && demandesPosition === 0);
+        // Une « photo » fabriquée pour le test
+        var toile = doc.createElement('canvas');
+        toile.width = 64; toile.height = 48;
+        toile.getContext('2d').fillRect(0, 0, 64, 48);
+        var image = await new Promise(function (r) { toile.toBlob(r, 'image/jpeg', 0.9); });
+        var transfert = new win.DataTransfer();
+        transfert.items.add(new win.File([image], 'dechets.jpg', { type: 'image/jpeg' }));
+        champPhoto.files = transfert.files;
+        champPhoto.dispatchEvent(new win.Event('change', { bubbles: true }));
+        await attendreQue(function () { return !!doc.querySelector('main img[alt="Photo des déchets à envoyer"]'); });
+        noter('US1 – la photo s\'affiche avant l\'envoi', !!doc.querySelector('main img[alt="Photo des déchets à envoyer"]'));
+        noter('US1 – la position n\'est pas demandée quand on prend la photo', demandesPosition === 0);
+        var zoneTexte = doc.querySelector('main textarea');
+        Object.getOwnPropertyDescriptor(win.HTMLTextAreaElement.prototype, 'value').set.call(zoneTexte, 'Bouteilles au pied de la cale');
+        zoneTexte.dispatchEvent(new win.Event('input', { bubbles: true }));
+        bouton('Envoyer le signalement').click();
+        await attendreQue(function () { return !!doc.querySelector('main .pin-signalement') && !!doc.querySelector('.leaflet-popup-content img'); });
+        noter('US1 – la position est demandée une seule fois, au moment de l\'envoi', demandesPosition === 1, demandesPosition + ' demande(s)');
+        noter('US16 – après l\'envoi, la carte montre le point avec la photo', !!doc.querySelector('main .pin-signalement') && !!doc.querySelector('.leaflet-popup-content img.bulle-photo'));
+        noter('US16 – la bulle reprend le commentaire', !!doc.querySelector('.leaflet-popup-content') && doc.querySelector('.leaflet-popup-content').textContent.indexOf('Bouteilles au pied de la cale') !== -1);
+
+        var titres = { Profil: 'Mon profil' };
         for (var nom in titres) {
           bouton(nom).click();
           await attendreQue(function () { return !!doc.querySelector('main h1') && doc.querySelector('main h1').textContent === titres[nom]; });
@@ -210,6 +245,12 @@
         bouton('Déconnexion').click();
         await attendreQue(function () { return !!bouton('Se connecter'); });
         noter('US15 – déconnexion', !!bouton('Se connecter'));
+        bouton('Signaler').click();
+        await attendreQue(function () { return texte().indexOf('Connecte-toi pour signaler') !== -1; });
+        noter('US1 – sans compte, l\'onglet Signaler demande de se connecter', texte().indexOf('Connecte-toi pour signaler') !== -1 && !doc.querySelector('main input[type=file]'));
+        bouton('Carte').click();
+        await attendreQue(function () { return doc.querySelectorAll('main .leaflet-marker-icon').length === 5; });
+        noter('US16 – sans compte, les signalements ne sont pas sur la carte', doc.querySelectorAll('main .pin-signalement').length === 0 && doc.querySelectorAll('main .leaflet-marker-icon').length === 5);
 
         bouton('Se connecter').click();
         await attendreQue(function () { return !!doc.querySelector('form'); });

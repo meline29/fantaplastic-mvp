@@ -94,7 +94,7 @@
           inscriptions.push({ id: nouvelId(), sortie_id: s.id, benevole_id: 'demo-benevole-' + k, created_at: maintenant });
         }
       });
-      return { profiles: [orga], comptes: [], sorties: sorties, inscriptions: inscriptions };
+      return { profiles: [orga], comptes: [], sorties: sorties, inscriptions: inscriptions, signalements: [] };
     }
 
     function donnees() {
@@ -104,8 +104,29 @@
           cache = donneesDeDemo();
           ecrire(CLE_DB, cache);
         }
+        if (!cache.signalements) cache.signalements = []; // données enregistrées avant les signalements
       }
       return cache;
+    }
+
+    // Comme sauver(), mais signale quand le navigateur n'a plus de place (photos des signalements)
+    function sauverOuSignalerPlein() {
+      memoire[CLE_DB] = cache;
+      try {
+        localStorage.setItem(CLE_DB, JSON.stringify(cache));
+      } catch (e) {
+        if (e && (e.name === 'QuotaExceededError' || e.code === 22)) throw e;
+        /* localStorage indisponible : on garde la copie en mémoire */
+      }
+    }
+
+    function lireCommeDataUrl(blob) {
+      return new Promise(function (ok, ko) {
+        var lecteur = new FileReader();
+        lecteur.onload = function () { ok(lecteur.result); };
+        lecteur.onerror = function () { ko(new Error("La photo n'a pas pu être lue.")); };
+        lecteur.readAsDataURL(blob);
+      });
     }
 
     function sauver() {
@@ -244,6 +265,41 @@
       return obtenirSortie(s.id);
     }
 
+    // ---------- US1 / US16 : signaler un endroit pollué, voir les signalements sur la carte ----------
+
+    function versEcranSignalement(s) {
+      return { id: s.id, lat: s.lat, lng: s.lng, precision_m: s.precision_m, commentaire: s.commentaire, created_at: s.created_at, photo: s.photo_url };
+    }
+
+    // champs = { photo (Blob), lat, lng, precision_m, commentaire } – position prise au moment de l'envoi
+    async function creerSignalement(champs) {
+      var moi = await utilisateurCourant();
+      if (!moi) throw new Error('Connecte-toi pour signaler un endroit pollué.');
+      var s = R.validerSignalement(champs);
+      var photo = await lireCommeDataUrl(s.photo); // dans la démo locale, la photo est gardée dans le navigateur
+      var d = donnees();
+      var signalement = {
+        id: nouvelId(), auteur_id: moi.id, photo_url: photo, lat: s.lat, lng: s.lng,
+        precision_m: s.precision_m, commentaire: s.commentaire, created_at: new Date().toISOString()
+      };
+      d.signalements.push(signalement);
+      try {
+        sauverOuSignalerPlein();
+      } catch (e) {
+        d.signalements.pop();
+        throw new Error('Plus de place pour les photos dans la démo locale : réinitialise les données de démo.');
+      }
+      return versEcranSignalement(signalement);
+    }
+
+    // Visible seulement une fois connecté (comme sur Supabase), du plus récent au plus ancien
+    async function listerSignalements() {
+      if (!(await utilisateurCourant())) return [];
+      return donnees().signalements.slice()
+        .sort(function (a, b) { return new Date(b.created_at) - new Date(a.created_at); })
+        .map(versEcranSignalement);
+    }
+
     // Démo uniquement : passer de bénévole à organisateur sans recréer de compte, pour les revues.
     // N'existe pas avec Supabase, où l'utilisateur ne peut pas changer son rôle lui-même.
     async function changerRoleDemo(role) {
@@ -282,6 +338,8 @@
       creerSortie: creerSortie,
       inscrireASortie: inscrireASortie,
       desinscrireDeSortie: desinscrireDeSortie,
+      creerSignalement: creerSignalement,
+      listerSignalements: listerSignalements,
       changerRoleDemo: changerRoleDemo,
       materielSecurite: R.MATERIEL_SECURITE.slice(),
       reinitialiser: reinitialiser,

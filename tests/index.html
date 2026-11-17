@@ -147,6 +147,24 @@
       var desinscrite = await db.desinscrireDeSortie(creee.id);
       noter('US14 – désinscription', desinscrite.je_suis_inscrit === false && desinscrite.nb_inscrits === 0);
 
+      // US1 / US16 : signaler des déchets (photo + position prise à l'envoi)
+      var photoTest = new Blob([new Uint8Array([255, 216, 255, 224, 0, 16])], { type: 'image/jpeg' });
+      var ici = { lat: 48.380131, lng: -4.487654, precision_m: 9.6 };
+      await db.deconnecter();
+      await doitEchouer('US1 – il faut être connecté pour signaler', db.creerSignalement(Object.assign({ photo: photoTest }, ici)), 'Connecte-toi');
+      noter('US16 – un visiteur ne voit aucun signalement', (await db.listerSignalements()).length === 0);
+      await db.connecter({ email: 'lou@exemple.fr', motDePasse: 'motdepasse1' });
+      await doitEchouer('US1 – photo obligatoire', db.creerSignalement(Object.assign({}, ici)), 'photo');
+      await doitEchouer('US1 – position obligatoire', db.creerSignalement({ photo: photoTest }), 'position');
+      await doitEchouer('US1 – commentaire de 280 caractères maximum', db.creerSignalement(Object.assign({ photo: photoTest, commentaire: new Array(282).join('x') }, ici)), '280');
+      var sig = await db.creerSignalement(Object.assign({ photo: photoTest, commentaire: '  Bouteilles au pied de la cale ' }, ici));
+      noter('US1 – signalement enregistré avec sa position et son commentaire',
+        sig.lat === 48.38013 && sig.lng === -4.48765 && sig.precision_m === 10 && sig.commentaire === 'Bouteilles au pied de la cale',
+        sig.lat + ', ' + sig.lng + ' ± ' + sig.precision_m + ' m');
+      noter('US1 – la photo est gardée', typeof sig.photo === 'string' && sig.photo.indexOf('data:image/jpeg') === 0);
+      var pourLaCarte = await db.listerSignalements();
+      noter('US16 – le signalement est dans la liste de la carte', pourLaCarte.length === 1 && pourLaCarte[0].id === sig.id);
+
       db._effacer();
       document.getElementById('resume').textContent = nbOk + ' test(s) OK, ' + nbKo + ' en échec';
       document.getElementById('resume').className = nbKo ? 'ko' : 'ok';

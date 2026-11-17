@@ -44,14 +44,17 @@ create table public.inscriptions (
   unique (sortie_id, benevole_id)
 );
 
+-- US1 : photo de déchets + position du téléphone au moment de l'envoi
 create table public.signalements (
   id           uuid primary key default gen_random_uuid(),
   auteur_id    uuid references public.profiles (id) on delete set null,
-  photo_url    text,
+  photo_url    text not null,   -- chemin de la photo dans le stockage « signalements »
   lat          double precision not null,
   lng          double precision not null,
-  commentaire  text,
-  created_at   timestamptz not null default now()
+  precision_m  integer check (precision_m is null or precision_m >= 0),
+  commentaire  text check (commentaire is null or char_length(commentaire) <= 280),
+  created_at   timestamptz not null default now(),
+  constraint signalements_position check (lat between -90 and 90 and lng between -180 and 180)
 );
 
 -- ---------- Création automatique du profil à l'inscription (US15) ----------
@@ -173,11 +176,32 @@ create policy "inscriptions_creation" on public.inscriptions
 create policy "inscriptions_suppression" on public.inscriptions
   for delete using (benevole_id = auth.uid());
 
--- Signalements : n'importe quel compte peut signaler, seuls les organisateurs voient tout
+-- Signalements (US1, US16) : n'importe quel compte peut signaler, à son nom, avec une photo
+-- rangée dans son propre dossier ; tous les comptes connectés les voient sur la carte.
 create policy "signalements_creation" on public.signalements
-  for insert with check (auteur_id = auth.uid());
+  for insert to authenticated
+  with check (auteur_id = auth.uid() and photo_url like auth.uid()::text || '/%');
 create policy "signalements_lecture" on public.signalements
-  for select using (auteur_id = auth.uid() or public.mon_role() in ('organisateur', 'admin'));
+  for select to authenticated
+  using (true);
+
+-- ---------- Stockage des photos des signalements ----------
+-- Privé : une photo peut montrer des personnes ou des plaques (TD2, risque R7).
+-- L'appli les affiche avec des liens temporaires, réservés aux comptes connectés.
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('signalements', 'signalements', false, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do nothing;
+
+create policy "photos_signalements_envoi" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'signalements' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "photos_signalements_lecture" on storage.objects
+  for select to authenticated
+  using (bucket_id = 'signalements');
+create policy "photos_signalements_suppression" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'signalements' and (storage.foldername(name))[1] = auth.uid()::text);
 
 -- ---------- Sorties d'exemple (tâche J-1 du TD1) ----------
 -- Dates calculées à partir du jour où le script est lancé (J+3 à J+14), à l'heure de Brest.
@@ -200,3 +224,7 @@ insert into public.sorties (titre, lieu, commune, date_debut, duree_min, places,
 -- drop view if exists public.sorties_a_venir;
 -- drop table if exists public.signalements, public.inscriptions, public.sorties, public.profiles cascade;
 -- drop function if exists public.creer_profil(), public.mon_role(), public.verifier_inscription();
+-- drop policy if exists "photos_signalements_envoi" on storage.objects;
+-- drop policy if exists "photos_signalements_lecture" on storage.objects;
+-- drop policy if exists "photos_signalements_suppression" on storage.objects;
+-- (les photos se suppriment depuis Storage > signalements, puis le bucket lui-même)
