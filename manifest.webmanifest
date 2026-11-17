@@ -1,0 +1,14 @@
+{
+  "name": "fantaPLASTIC – Rade de Brest",
+  "short_name": "fantaPLASTIC",
+  "description": "Sorties de ramassage de déchets sur le littoral de la rade de Brest.",
+  "lang": "fr",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#F6F1E7",
+  "theme_color": "#0B2A4A",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

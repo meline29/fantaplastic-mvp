@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Test du parcours – sprint 1</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 16px; background: #F6F1E7; color: #0B2A4A; display: flex; gap: 24px; }
+    iframe { width: 375px; height: 760px; border: 1px solid #999; background: #fff; }
+    .ok { color: #0E7C74; } .ko { color: #B3261E; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <iframe id="app"></iframe>
+  <div>
+    <h1>Parcours bénévole – sprint 1</h1>
+    <p id="resume">Test en cours…</p>
+    <ol id="etapes"></ol>
+  </div>
+  <script>
+    // Rejoue le parcours de bout en bout dans l'appli : voir les sorties, créer un compte, se déconnecter.
+    // Attention : remet les données de démo à zéro à la fin.
+    var nbOk = 0, nbKo = 0;
+    function noter(nom, ok) {
+      var li = document.createElement('li');
+      li.className = ok ? 'ok' : 'ko';
+      li.textContent = (ok ? '✔ ' : '✘ ') + nom;
+      document.getElementById('etapes').appendChild(li);
+      if (ok) nbOk++; else nbKo++;
+    }
+    function attendre(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+    async function attendreQue(test, maxMs) {
+      var t = 0;
+      while (t < (maxMs || 4000)) { if (test()) return true; await attendre(100); t += 100; }
+      return false;
+    }
+
+    document.getElementById('app').addEventListener('load', async function () {
+      var win = this.contentWindow, doc = win.document;
+      function texte() { return doc.body.innerText; }
+      function bouton(libelle) {
+        return Array.from(doc.querySelectorAll('button')).find(function (b) { return b.textContent.trim() === libelle; });
+      }
+      function saisir(label, valeur) {
+        var champ = Array.from(doc.querySelectorAll('label')).find(function (l) { return l.textContent.indexOf(label) === 0; }).querySelector('input');
+        var setter = Object.getOwnPropertyDescriptor(win.HTMLInputElement.prototype, 'value').set;
+        setter.call(champ, valeur);
+        champ.dispatchEvent(new win.Event('input', { bubbles: true }));
+      }
+
+      try {
+        await attendreQue(function () { return doc.querySelectorAll('li').length > 0; });
+
+        noter('US3 – 4 sorties à venir affichées', doc.querySelectorAll('main li').length === 4);
+        noter('US3 – une sortie affichée "Complet"', texte().indexOf('Complet') !== -1);
+        noter('US3 – places restantes affichées', /\d+ places restantes/.test(texte()));
+
+        bouton('Créer mon compte bénévole').click();
+        await attendreQue(function () { return !!doc.querySelector('form'); });
+        noter('US15 – le formulaire de création de compte s\'ouvre', !!doc.querySelector('form'));
+
+        saisir('Prénom', 'Lou');
+        saisir('Email', 'lou@exemple.fr');
+        saisir('Mot de passe', '1234');
+        bouton('Créer mon compte').click();
+        await attendreQue(function () { return texte().indexOf('8 caractères minimum') !== -1 && !!doc.querySelector('[role=alert]'); });
+        noter('US15 – mot de passe trop court : message d\'erreur', !!doc.querySelector('[role=alert]'));
+
+        saisir('Mot de passe', 'motdepasse1');
+        bouton('Créer mon compte').click();
+        await attendreQue(function () { return !!bouton('Déconnexion'); });
+        noter('US15 – compte créé et connecté (bouton Déconnexion)', !!bouton('Déconnexion'));
+        noter('US15 – message de bienvenue avec le prénom', texte().indexOf('Bienvenue Lou') !== -1);
+        noter('US3 – la liste reste visible une fois connecté', doc.querySelectorAll('main li').length === 4);
+
+        bouton('Déconnexion').click();
+        await attendreQue(function () { return !!bouton('Se connecter'); });
+        noter('US15 – déconnexion', !!bouton('Se connecter'));
+
+        bouton('Se connecter').click();
+        await attendreQue(function () { return !!doc.querySelector('form'); });
+        saisir('Email', 'lou@exemple.fr');
+        saisir('Mot de passe', 'motdepasse1');
+        bouton('Me connecter').click();
+        await attendreQue(function () { return !!bouton('Déconnexion'); });
+        noter('US15 – reconnexion avec le même compte', !!bouton('Déconnexion'));
+
+        await win.FantaDB.reinitialiser();
+      } catch (e) {
+        noter('Erreur : ' + e.message, false);
+      }
+      document.getElementById('resume').textContent = nbOk + ' étape(s) OK, ' + nbKo + ' en échec';
+      document.getElementById('resume').className = nbKo ? 'ko' : 'ok';
+      document.title = (nbKo ? 'ECHEC ' : 'OK ') + nbOk + '/' + (nbOk + nbKo);
+    }, { once: true });
+
+    // On repart des données de démo (même origine que l'appli, donc même stockage)
+    try {
+      localStorage.removeItem('fantaplastic.db.v1');
+      localStorage.removeItem('fantaplastic.session.v1');
+    } catch (e) { /* stockage indisponible : l'appli utilisera la mémoire */ }
+    document.getElementById('app').src = '../index.html';
+  </script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tests sprint 1</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 24px; background: #F6F1E7; color: #0B2A4A; }
+    li { margin: 4px 0; }
+    .ok { color: #0E7C74; }
+    .ko { color: #B3261E; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>Tests de la couche de données – sprint 1</h1>
+  <p id="resume">Tests en cours…</p>
+  <ul id="liste"></ul>
+
+  <script src="../js/db.js"></script>
+  <script>
+    (async function () {
+      var liste = document.getElementById('liste');
+      var nbOk = 0, nbKo = 0;
+
+      function noter(nom, ok, detail) {
+        var li = document.createElement('li');
+        li.className = ok ? 'ok' : 'ko';
+        li.textContent = (ok ? '✔ ' : '✘ ') + nom + (detail ? ' (' + detail + ')' : '');
+        liste.appendChild(li);
+        if (ok) nbOk++; else nbKo++;
+      }
+
+      async function doitEchouer(nom, promesse, morceauDuMessage) {
+        try { await promesse; noter(nom, false, "aucune erreur levée"); }
+        catch (e) { noter(nom, e.message.indexOf(morceauDuMessage) !== -1, e.message); }
+      }
+
+      // Instance séparée pour ne pas toucher aux données de démo
+      var db = creerFantaDB({ prefixe: 'test-' + Date.now() });
+
+      // US3
+      var sorties = await db.listerSortiesAVenir();
+      noter('US3 – la liste contient les 4 sorties à venir de la démo', sorties.length === 4, sorties.length + ' sorties');
+      noter('US3 – la sortie passée n\'apparaît pas', sorties.every(function (s) { return new Date(s.date_debut) >= new Date(); }));
+      var triee = sorties.every(function (s, i) { return i === 0 || new Date(sorties[i - 1].date_debut) <= new Date(s.date_debut); });
+      noter('US3 – les sorties sont triées par date', triee);
+      noter('US3 – places restantes = places - inscrits', sorties.every(function (s) { return s.places_restantes === Math.max(0, s.places - s.nb_inscrits); }));
+      noter('US3 – une sortie pleine affiche 0 place restante', sorties.some(function (s) { return s.places_restantes === 0; }));
+
+      // US15
+      noter('US15 – personne n\'est connecté au départ', (await db.utilisateurCourant()) === null);
+      var profil = await db.inscrire({ prenom: '  Lou ', email: 'Lou@Exemple.fr ', motDePasse: 'motdepasse1' });
+      noter('US15 – création de compte', profil && profil.prenom === 'Lou' && profil.email === 'lou@exemple.fr');
+      noter('US15 – le nouveau compte est bénévole', profil.role === 'benevole');
+      noter('US15 – connecté automatiquement après la création', (await db.utilisateurCourant()).id === profil.id);
+      noter('US15 – le mot de passe n\'est jamais renvoyé', !('motDePasse' in profil) && !('empreinte' in profil));
+      await doitEchouer('US15 – email déjà utilisé refusé', db.inscrire({ prenom: 'Lou', email: 'lou@exemple.fr', motDePasse: 'autre12345' }), 'existe déjà');
+      await doitEchouer('US15 – prénom vide refusé', db.inscrire({ prenom: '  ', email: 'a@b.fr', motDePasse: '12345678' }), 'prénom');
+      await doitEchouer('US15 – email invalide refusé', db.inscrire({ prenom: 'Al', email: 'pas-un-email', motDePasse: '12345678' }), 'email');
+      await doitEchouer('US15 – mot de passe trop court refusé', db.inscrire({ prenom: 'Al', email: 'al@b.fr', motDePasse: '1234' }), '8 caractères');
+
+      await db.deconnecter();
+      noter('US15 – déconnexion', (await db.utilisateurCourant()) === null);
+      await doitEchouer('US15 – mauvais mot de passe refusé', db.connecter({ email: 'lou@exemple.fr', motDePasse: 'faux-mdp-123' }), 'incorrect');
+      await doitEchouer('US15 – email inconnu refusé', db.connecter({ email: 'inconnu@exemple.fr', motDePasse: 'motdepasse1' }), 'incorrect');
+      var reco = await db.connecter({ email: 'LOU@exemple.fr', motDePasse: 'motdepasse1' });
+      noter('US15 – reconnexion (email insensible à la casse)', reco.id === profil.id);
+
+      db._effacer();
+      document.getElementById('resume').textContent = nbOk + ' test(s) OK, ' + nbKo + ' en échec';
+      document.getElementById('resume').className = nbKo ? 'ko' : 'ok';
+      document.title = (nbKo ? 'ECHEC ' : 'OK ') + nbOk + '/' + (nbOk + nbKo);
+    })().catch(function (e) {
+      document.getElementById('resume').textContent = 'Erreur pendant les tests : ' + e.message;
+      document.getElementById('resume').className = 'ko';
+    });
+  </script>
+</body>
+</html>
