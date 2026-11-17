@@ -66,6 +66,15 @@
     });
   }
 
+  // Où en est l'autorisation de localisation pour ce site ? 'granted', 'prompt', 'denied' ou 'inconnu'
+  // (on ne demande rien ici : on regarde seulement si le navigateur a déjà une réponse)
+  function etatPermissionPosition() {
+    if (!navigator.permissions || !navigator.permissions.query) return Promise.resolve('inconnu');
+    return navigator.permissions.query({ name: 'geolocation' })
+      .then(function (r) { return r.state; })
+      .catch(function () { return 'inconnu'; });
+  }
+
   // ---------- écran ----------
 
   function IconeAppareil() {
@@ -101,6 +110,7 @@
     var _co = useState(''), commentaire = _co[0], setCommentaire = _co[1];
     var _et = useState(''), etape = _et[0], setEtape = _et[1]; // '', photo, position, envoi
     var _er = useState(''), erreur = _er[0], setErreur = _er[1];
+    var _ac = useState(false), demandeAccord = _ac[0], setDemandeAccord = _ac[1];
 
     useEffect(function () {
       return function () { if (apercu) URL.revokeObjectURL(apercu); };
@@ -139,10 +149,25 @@
       });
     }
 
+    // 1er temps : on vérifie la photo et on demande l'accord pour la localisation (dans l'appli),
+    // sauf si le site est déjà autorisé. Si la localisation est bloquée, on explique comment la réactiver.
     async function envoyer(e) {
       e.preventDefault();
       setErreur('');
       if (!photo) { setErreur('Prends une photo des déchets.'); return; }
+      var etat = await window.FantaSignaler.etatPermissionPosition();
+      if (etat === 'denied') {
+        setErreur("La localisation est bloquée pour ce site. Pour l'autoriser : touche le cadenas (ou les réglages du site) à côté de l'adresse, puis Autorisations > Position, et réessaie.");
+        return;
+      }
+      if (etat === 'granted') { envoyerAvecPosition(); return; }
+      setDemandeAccord(true);
+    }
+
+    // 2e temps : la position est prise maintenant (le téléphone affiche sa propre demande), puis envoi
+    async function envoyerAvecPosition() {
+      setDemandeAccord(false);
+      setErreur('');
       try {
         setEtape('position');
         var position = await window.FantaSignaler.obtenirPosition(); // la position n'est demandée qu'ici
@@ -181,13 +206,28 @@
             <span>Ta position sera demandée une seule fois, au moment de l'envoi, pour placer la photo sur la carte. Elle n'est pas suivie ensuite.</span>
           </p>
           ${erreur ? html`<p role="alert" className="rounded-xl bg-corail/10 px-3 py-2 text-sm text-corail-fonce">${erreur}</p>` : null}
-          <button type="submit" disabled=${occupe}
-            className="w-full rounded-xl bg-marine px-4 py-3 font-semibold text-white transition hover:bg-marine/90 disabled:opacity-60">
-            ${libelle}
-          </button>
+          ${demandeAccord
+            ? html`<div role="group" aria-labelledby="titre-accord" className="rounded-xl bg-lagon/10 p-4 ring-1 ring-lagon/40">
+                <p id="titre-accord" className="font-semibold text-marine">Autoriser la localisation ?</p>
+                <p className="mt-1 text-sm text-slate-700">Pour placer ta photo sur la carte, fantaPLASTIC a besoin de ta position. Elle est prise une seule fois, maintenant, et n'est pas suivie ensuite. Ton téléphone va ensuite te demander de confirmer.</p>
+                <button type="button" className="mt-3 w-full rounded-xl bg-marine px-4 py-3 font-semibold text-white transition hover:bg-marine/90" onClick=${envoyerAvecPosition}>Oui, utiliser ma position</button>
+                <button type="button" className="mt-2 w-full rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 underline"
+                  onClick=${function () { setDemandeAccord(false); setErreur('Sans ta position, le signalement ne peut pas être placé sur la carte. Tu peux réessayer quand tu veux.'); }}>
+                  Non, annuler
+                </button>
+              </div>`
+            : html`<button type="submit" disabled=${occupe}
+                className="w-full rounded-xl bg-marine px-4 py-3 font-semibold text-white transition hover:bg-marine/90 disabled:opacity-60">
+                ${libelle}
+              </button>`}
         </form>
       </section>`;
   }
 
-  window.FantaSignaler = { OngletSignaler: OngletSignaler, compresserPhoto: compresserPhoto, obtenirPosition: obtenirPosition };
+  window.FantaSignaler = {
+    OngletSignaler: OngletSignaler,
+    compresserPhoto: compresserPhoto,
+    obtenirPosition: obtenirPosition,
+    etatPermissionPosition: etatPermissionPosition
+  };
 })();

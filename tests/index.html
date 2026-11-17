@@ -165,6 +165,38 @@
       var pourLaCarte = await db.listerSignalements();
       noter('US16 – le signalement est dans la liste de la carte', pourLaCarte.length === 1 && pourLaCarte[0].id === sig.id);
 
+      // Profil : badges et score de fidélité
+      var regles = window.FantaRegles;
+      function ramassagesFictifs(n) {
+        var l = [];
+        for (var k = 0; k < n; k++) l.push({ date_debut: new Date(2026, k % 12, 5, 10).toISOString() });
+        return l;
+      }
+      function obtenus(bilan) { return bilan.badges.filter(function (b) { return b.obtenu; }).map(function (b) { return b.nom; }).join(', '); }
+      var b0 = regles.bilanFidelite([], 0);
+      noter('Profil – aucun ramassage : aucun badge, prochain = Sardine Plastic', obtenus(b0) === '' && b0.prochain.nom === 'Sardine Plastic' && b0.restants === 1 && b0.score === 0);
+      var b1 = regles.bilanFidelite(ramassagesFictifs(1), 0);
+      noter('Profil – 1 ramassage : Sardine Plastic', obtenus(b1) === 'Sardine Plastic' && b1.prochain.nom === 'Cabillaud Bouteille' && b1.restants === 4, obtenus(b1));
+      var b20 = regles.bilanFidelite(ramassagesFictifs(20), 0);
+      noter('Profil – 20 ramassages : jusqu\'au Poulpe Bouchon', obtenus(b20) === 'Sardine Plastic, Cabillaud Bouteille, Poulpe Bouchon' && b20.prochain.nom === 'Tortue Filet', obtenus(b20));
+      var b49 = regles.bilanFidelite(ramassagesFictifs(49), 0);
+      noter('Profil – 49 ramassages : pas encore la Tortue Filet', b49.badges[3].obtenu === false && b49.restants === 1);
+      var b100 = regles.bilanFidelite(ramassagesFictifs(100), 0);
+      noter('Profil – 100 ramassages : les 5 badges, jusqu\'au Requin Recyclé', b100.badges.every(function (b) { return b.obtenu; }) && b100.prochain === null);
+      var b3 = regles.bilanFidelite([{ date_debut: '2026-09-05T08:00:00Z' }, { date_debut: '2026-09-20T08:00:00Z' }, { date_debut: '2026-10-03T08:00:00Z' }], 4);
+      noter('Profil – score : 10 pts par ramassage, 2 par signalement, 5 par mois actif', b3.score === 30 + 8 + 10, b3.score + ' points');
+
+      var profilLou = await db.monProfil();
+      noter('Profil – sans ramassage passé : 0 ramassage, le signalement est compté', profilLou.profil.prenom === 'Lou' && profilLou.bilan.nbRamassages === 0 && profilLou.bilan.nbSignalements === 1);
+      await db.ajouterRamassagesDemo(5);
+      profilLou = await db.monProfil();
+      var r = profilLou.ramassages;
+      noter('Profil – 5 ramassages passés : 2 badges, historique du plus récent au plus ancien',
+        profilLou.bilan.nbRamassages === 5 && obtenus(profilLou.bilan) === 'Sardine Plastic, Cabillaud Bouteille' && new Date(r[0].date_debut) > new Date(r[4].date_debut),
+        obtenus(profilLou.bilan));
+      await db.deconnecter();
+      await doitEchouer('Profil – il faut être connecté', db.monProfil(), 'Connecte-toi');
+
       db._effacer();
       document.getElementById('resume').textContent = nbOk + ' test(s) OK, ' + nbKo + ' en échec';
       document.getElementById('resume').className = nbKo ? 'ko' : 'ok';

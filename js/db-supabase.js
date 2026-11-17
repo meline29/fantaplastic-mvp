@@ -217,6 +217,21 @@
     return avecPhotos(lignes);
   }
 
+  // ---------- Profil : historique des ramassages, score de fidélité, badges ----------
+
+  async function monProfil() {
+    var moi = await profilCourant();
+    if (!moi) throw new Error('Connecte-toi pour voir ton profil.');
+    // Mes inscriptions, avec la sortie correspondante (lien sortie_id → sorties)
+    var lignes = verifier(await sb.from('inscriptions')
+      .select('created_at, sortie:sorties(id, titre, lieu, commune, date_debut, duree_min, statut)')
+      .eq('benevole_id', moi.id));
+    var h = R.historique(lignes.map(function (l) { return l.sortie; }));
+    var compte = await sb.from('signalements').select('id', { count: 'exact', head: true }).eq('auteur_id', moi.id);
+    var nbSignalements = compte.error ? 0 : (compte.count || 0);
+    return { profil: moi, ramassages: h.faits, aVenir: h.aVenir, bilan: R.bilanFidelite(h.faits, nbSignalements) };
+  }
+
   // Pas de bascule de rôle ni de remise à zéro ici : ce sont des outils de la démo locale.
   window.FantaDB = {
     mode: 'supabase',
@@ -231,6 +246,7 @@
     desinscrireDeSortie: desinscrireDeSortie,
     creerSignalement: creerSignalement,
     listerSignalements: listerSignalements,
+    monProfil: monProfil,
     materielSecurite: R.MATERIEL_SECURITE.slice()
   };
 })();

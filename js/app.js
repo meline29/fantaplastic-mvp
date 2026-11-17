@@ -594,15 +594,6 @@
       </nav>`;
   }
 
-  // Onglets préparés pour les prochains sprints : volontairement vides pour l'instant
-  function OngletVide(props) {
-    return html`
-      <section>
-        <h1 className="text-xl font-bold text-marine">${props.titre}</h1>
-        <p className="mt-2 text-sm text-slate-500">Bientôt disponible.</p>
-      </section>`;
-  }
-
   // ---------- application ----------
 
   function EnTete(props) {
@@ -759,7 +750,8 @@
       contenu = html`<${FormulaireSecurite} id=${sortieOuverte} onInscrit=${inscrit} onAnnuler=${function () { setVue('detail'); }} />`;
     } else if (vue === 'detail' || vue === 'securite') {
       contenu = html`<${DetailSortie} key=${sortieOuverte} id=${sortieOuverte} utilisateur=${utilisateur}
-        onRetour=${retourAuxSorties} libelleRetour=${onglet === 'carte' ? 'Retour à la carte' : 'Toutes les sorties'}
+        onRetour=${retourAuxSorties}
+        libelleRetour=${onglet === 'carte' ? 'Retour à la carte' : onglet === 'profil' ? 'Retour au profil' : 'Toutes les sorties'}
         onInscrire=${function () { setVue('securite'); window.scrollTo(0, 0); }}
         onSeConnecter=${seConnecter}
         onDesinscrit=${function () { chargerSorties(); setMessage('Tu es désinscrit·e de cette sortie.'); }} />`;
@@ -798,8 +790,10 @@
       contenu = html`<${window.FantaSignaler.OngletSignaler} utilisateur=${utilisateur}
         onSeConnecter=${seConnecter} onCreerCompte=${function () { setVue('inscription'); }} onEnvoye=${signalementEnvoye} />`;
     } else {
-      var infos = ONGLETS.find(function (o) { return o.id === onglet; });
-      contenu = html`<${OngletVide} titre=${infos.titre} />`;
+      // onglet « Profil » : historique, score de fidélité, badges
+      contenu = html`<${window.FantaProfil.OngletProfil} utilisateur=${utilisateur}
+        onSeConnecter=${seConnecter} onCreerCompte=${function () { setVue('inscription'); }}
+        onOuvrirSortie=${ouvrirSortie} onVoirSorties=${function () { choisirOnglet('sorties'); }} />`;
     }
 
     return html`

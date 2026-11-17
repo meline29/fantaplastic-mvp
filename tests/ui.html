@@ -203,6 +203,7 @@
         noter('US1 – connecté, l\'onglet Signaler ouvre l\'appareil photo', !!champPhoto && champPhoto.getAttribute('accept') === 'image/*' && champPhoto.getAttribute('capture') === 'environment');
         // La position GPS est simulée, et on compte combien de fois elle est demandée
         var demandesPosition = 0;
+        win.FantaSignaler.etatPermissionPosition = function () { return Promise.resolve('prompt'); }; // pas encore autorisé
         win.FantaSignaler.obtenirPosition = function () {
           demandesPosition++;
           return Promise.resolve({ lat: 48.38013, lng: -4.48765, precision_m: 9 });
@@ -226,18 +227,27 @@
         Object.getOwnPropertyDescriptor(win.HTMLTextAreaElement.prototype, 'value').set.call(zoneTexte, 'Bouteilles au pied de la cale');
         zoneTexte.dispatchEvent(new win.Event('input', { bubbles: true }));
         bouton('Envoyer le signalement').click();
+        await attendreQue(function () { return texte().indexOf('Autoriser la localisation ?') !== -1; });
+        noter('US1 – à l\'envoi, l\'appli demande d\'abord l\'accord pour la localisation', texte().indexOf('Autoriser la localisation ?') !== -1 && demandesPosition === 0);
+        bouton('Oui, utiliser ma position').click();
         await attendreQue(function () { return !!doc.querySelector('main .pin-signalement') && !!doc.querySelector('.leaflet-popup-content img'); });
         noter('US1 – la position est demandée une seule fois, au moment de l\'envoi', demandesPosition === 1, demandesPosition + ' demande(s)');
         noter('US16 – après l\'envoi, la carte montre le point avec la photo', !!doc.querySelector('main .pin-signalement') && !!doc.querySelector('.leaflet-popup-content img.bulle-photo'));
         noter('US16 – la bulle reprend le commentaire', !!doc.querySelector('.leaflet-popup-content') && doc.querySelector('.leaflet-popup-content').textContent.indexOf('Bouteilles au pied de la cale') !== -1);
 
-        var titres = { Profil: 'Mon profil' };
-        for (var nom in titres) {
-          bouton(nom).click();
-          await attendreQue(function () { return !!doc.querySelector('main h1') && doc.querySelector('main h1').textContent === titres[nom]; });
-          var titreOk = !!doc.querySelector('main h1') && doc.querySelector('main h1').textContent === titres[nom];
-          noter('Onglets – « ' + nom + ' » s\'ouvre et reste vide', titreOk && doc.querySelectorAll('main li').length === 0);
-        }
+        // Profil : historique, score de fidélité, badges
+        bouton('Profil').click();
+        await attendreQue(function () { return texte().indexOf('Score de fidélité') !== -1; });
+        noter('Profil – prénom, score de fidélité et les 5 badges', !!doc.querySelector('main h1') && doc.querySelector('main h1').textContent === 'Mon profil'
+          && texte().indexOf('Lou') !== -1 && doc.querySelectorAll('main img[src^="assets/badges/"]').length === 5);
+        noter('Profil – aucun badge sans ramassage passé', doc.querySelectorAll('main img[alt$="(obtenu)"]').length === 0);
+        noter('Profil – le signalement compte dans le score', texte().indexOf('1 signalement de déchets') !== -1);
+        noter('Profil – la sortie à venir de Lou est dans « Mes prochaines sorties »', texte().indexOf('Mes prochaines sorties (1)') !== -1 && texte().indexOf('Ramassage à la plage du Moulin Blanc') !== -1);
+        bouton('Démo · ajouter 5 ramassages passés').click();
+        await attendreQue(function () { return doc.querySelectorAll('main img[alt$="(obtenu)"]').length === 2; });
+        var badgesObtenus = Array.from(doc.querySelectorAll('main img[alt$="(obtenu)"]')).map(function (i) { return i.alt; }).join(' / ');
+        noter('Profil – 5 ramassages : Sardine Plastic et Cabillaud Bouteille obtenus', badgesObtenus.indexOf('Sardine Plastic') !== -1 && badgesObtenus.indexOf('Cabillaud Bouteille') !== -1, badgesObtenus);
+        noter('Profil – historique de 5 ramassages et prochain badge annoncé', texte().indexOf('Mes ramassages (5)') !== -1 && texte().indexOf('Encore 15 ramassages pour débloquer Poulpe Bouchon') !== -1);
         bouton('Sorties').click();
         await attendreQue(function () { return doc.querySelectorAll('main li').length === 5; });
         noter('Onglets – retour sur « Sorties » : la liste est là', doc.querySelectorAll('main li').length === 5);
@@ -248,6 +258,9 @@
         bouton('Signaler').click();
         await attendreQue(function () { return texte().indexOf('Connecte-toi pour signaler') !== -1; });
         noter('US1 – sans compte, l\'onglet Signaler demande de se connecter', texte().indexOf('Connecte-toi pour signaler') !== -1 && !doc.querySelector('main input[type=file]'));
+        bouton('Profil').click();
+        await attendreQue(function () { return texte().indexOf('Connecte-toi pour voir ton profil') !== -1; });
+        noter('Profil – sans compte, l\'onglet demande de se connecter', texte().indexOf('Connecte-toi pour voir ton profil') !== -1);
         bouton('Carte').click();
         await attendreQue(function () { return doc.querySelectorAll('main .leaflet-marker-icon').length === 5; });
         noter('US16 – sans compte, les signalements ne sont pas sur la carte', doc.querySelectorAll('main .pin-signalement').length === 0 && doc.querySelectorAll('main .leaflet-marker-icon').length === 5);

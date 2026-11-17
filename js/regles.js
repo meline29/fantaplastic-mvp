@@ -144,7 +144,63 @@
     };
   }
 
+  // ---------- Profil : badges et score de fidélité ----------
+  // Un « ramassage » = une sortie passée (non annulée) à laquelle on était inscrit.
+
+  var BADGES = [
+    { seuil: 1, id: 'sardine-plastic', nom: 'Sardine Plastic' },
+    { seuil: 5, id: 'cabillaud-bouteille', nom: 'Cabillaud Bouteille' },
+    { seuil: 20, id: 'poulpe-bouchon', nom: 'Poulpe Bouchon' },
+    { seuil: 50, id: 'tortue-filet', nom: 'Tortue Filet' },
+    { seuil: 100, id: 'requin-recycle', nom: 'Requin Recyclé' }
+  ];
+
+  // Score de fidélité : on récompense la participation, les signalements et la régularité
+  var POINTS = { ramassage: 10, signalement: 2, moisActif: 5 };
+
+  // Sépare les sorties où l'on est inscrit en « ramassages faits » (passés) et « à venir »
+  function historique(sorties) {
+    var maintenant = Date.now();
+    var valides = sorties.filter(function (s) { return s && s.statut !== 'annulee'; });
+    return {
+      faits: valides.filter(function (s) { return new Date(s.date_debut).getTime() < maintenant; })
+        .sort(function (a, b) { return new Date(b.date_debut) - new Date(a.date_debut); }),
+      aVenir: valides.filter(function (s) { return new Date(s.date_debut).getTime() >= maintenant; })
+        .sort(function (a, b) { return new Date(a.date_debut) - new Date(b.date_debut); })
+    };
+  }
+
+  function bilanFidelite(ramassages, nbSignalements) {
+    var nb = ramassages.length;
+    var mois = {};
+    ramassages.forEach(function (r) {
+      var d = new Date(r.date_debut);
+      mois[d.getFullYear() + '-' + d.getMonth()] = true;
+    });
+    var nbMois = Object.keys(mois).length;
+    var detail = {
+      ramassages: nb * POINTS.ramassage,
+      signalements: nbSignalements * POINTS.signalement,
+      regularite: nbMois * POINTS.moisActif
+    };
+    var prochain = BADGES.find(function (b) { return nb < b.seuil; }) || null;
+    return {
+      nbRamassages: nb,
+      nbSignalements: nbSignalements,
+      nbMoisActifs: nbMois,
+      detail: detail,
+      score: detail.ramassages + detail.signalements + detail.regularite,
+      badges: BADGES.map(function (b) { return Object.assign({ obtenu: nb >= b.seuil }, b); }),
+      prochain: prochain,
+      restants: prochain ? prochain.seuil - nb : 0
+    };
+  }
+
   window.FantaRegles = {
+    BADGES: BADGES,
+    POINTS: POINTS,
+    historique: historique,
+    bilanFidelite: bilanFidelite,
     validerSignalement: validerSignalement,
     MATERIEL_SECURITE: MATERIEL_SECURITE,
     enListe: enListe,

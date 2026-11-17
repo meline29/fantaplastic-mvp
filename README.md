@@ -9,8 +9,8 @@ Application web (PWA) pour les bénévoles ramasseurs de la rade de Brest.
 - **Deux modes :** si `js/config.js` contient l'URL et la clé Supabase, l'appli utilise la vraie base. Sinon, ou si on ajoute `?mode=local` à l'adresse, elle tourne en **démo locale** (données dans le navigateur, bascule « Démo · rôle » et remise à zéro disponibles).
 
 Les tests s'ouvrent de la même façon (ils tournent toujours sur la démo locale) :
-- `tests/index.html` : 61 tests de la couche de données (comptes, rôles, liste et fiche des sorties, création d'une sortie avec son point de rendez-vous, matériel de sécurité, inscription, signalements) ;
-- `tests/ui.html` : rejoue le parcours dans l'appli, en 56 étapes (sorties, fiche d'une sortie, création de compte organisateur, création d'une sortie avec son point sur la carte, bascule de rôle, formulaire de sécurité et inscription, carte des sorties, signalement avec photo, onglets, connexion). La position GPS et la recherche de lieux y sont simulées. **Attention, il remet les données de démo à zéro.**
+- `tests/index.html` : 70 tests de la couche de données (comptes, rôles, liste et fiche des sorties, création d'une sortie avec son point de rendez-vous, matériel de sécurité, inscription, signalements, badges et score de fidélité) ;
+- `tests/ui.html` : rejoue le parcours dans l'appli, en 63 étapes (sorties, fiche d'une sortie, création de compte organisateur, création d'une sortie avec son point sur la carte, bascule de rôle, formulaire de sécurité et inscription, carte des sorties, signalement avec photo et accord pour la localisation, profil et badges, connexion). La position GPS et la recherche de lieux y sont simulées. **Attention, il remet les données de démo à zéro.**
 - `tests/supabase.html` : vérifie la base en ligne, en lecture seule (config remplie, script SQL exécuté, règles d'accès qui bloquent un visiteur).
 
 ## Revenir à une version précédente (git)
@@ -30,7 +30,9 @@ git switch main                # revenir à la dernière version
 | `index.html` | page unique, charge React 18, htm (JSX sans compilation) et Tailwind |
 | `js/app.js` | les écrans : en-tête, accueil, liste et fiche des sorties, création d'une sortie, formulaires de compte, onglets |
 | `js/carte.js` | les cartes (Leaflet + fonds OpenStreetMap) : l'onglet « Carte » (sorties et déchets signalés) et le choix du point de rendez-vous |
-| `js/signaler.js` | l'onglet « Signaler » : photo des déchets, position GPS prise à l'envoi |
+| `js/signaler.js` | l'onglet « Signaler » : photo des déchets, accord puis position GPS prise à l'envoi |
+| `js/profil.js` | l'onglet « Profil » : historique des ramassages, score de fidélité, badges |
+| `assets/badges/` | les 5 badges (découpés dans l'image de l'équipe) |
 | `js/regles.js` | les règles communes : contrôles des comptes et des sorties, matériel de sécurité, engagements |
 | `js/db.js` | la couche de données en « démo locale » (stockage du navigateur) |
 | `js/db-supabase.js` | la même couche de données, branchée sur Supabase (comptes, base PostgreSQL) |
@@ -80,9 +82,14 @@ Toujours pas fait : le branchement sur Supabase (T2) et l'inscription à une sor
 | US6 – Carte des rendez-vous | 3 | Fait : onglet **Carte** avec un point par sortie à venir (vert : places libres, jaune : 3 places ou moins, rouge : complet). Un clic sur un point ouvre une bulle, puis « Voir la sortie » ouvre la fiche. À la création, le point de rendez-vous **se place tout seul** d'après le lieu et la commune (recherche sur OpenStreetMap, puis dans la Base Adresse Nationale) ; l'organisateur le vérifie et peut le déplacer ou le poser à la main. Point obligatoire, autour de la rade de Brest. |
 | T2 / T3 – Base de données et déploiement | 4 + 5 | Fait : base Supabase et site en ligne sur Vercel (voir plus bas). |
 | US1 – Signaler un endroit pollué | 3 | Fait : onglet **Signaler**, réservé aux comptes connectés. On prend une photo des déchets (l'appareil photo s'ouvre), on ajoute un commentaire si on veut, puis « Envoyer le signalement ». **La position GPS n'est demandée qu'à ce moment-là**, une seule fois. La photo est allégée et ses métadonnées (modèle du téléphone, position enregistrée dans le fichier) sont retirées avant l'envoi. |
+| Profil, badges et fidélité | – | Fait : onglet **Profil** avec le prénom, le rôle, la date d'inscription, l'**historique des ramassages** (sorties passées où l'on était inscrit), les **prochaines sorties**, le **score de fidélité** et les **badges** : Sardine Plastic (1 ramassage), Cabillaud Bouteille (5), Poulpe Bouchon (20), Tortue Filet (50), Requin Recyclé (100). Les badges pas encore obtenus sont grisés, avec une barre de progression vers le suivant. |
 | US16 – Signalements sur la carte | 2 | Fait : chaque signalement est un rond corail avec un appareil photo sur la carte, avec la photo, la date et le commentaire dans sa bulle. Visible seulement par les comptes connectés. Après l'envoi, la carte s'ouvre directement sur la photo. |
 
 Les sorties créées avant la carte n'ont pas de point : elles sont listées sous la carte, dans « Pas encore sur la carte ».
+
+**Score de fidélité** = 10 points par ramassage + 2 points par signalement de déchets + 5 points par mois où l'on a fait au moins un ramassage (pour récompenser la régularité). Un « ramassage » est une sortie passée à laquelle on était inscrit : il n'y a pas encore de pointage de présence par l'organisateur. En démo locale, le bouton « Démo · ajouter 5 ramassages passés » du profil permet de montrer les badges pendant une revue.
+
+**Localisation :** au moment d'envoyer un signalement, l'appli explique pourquoi elle a besoin de la position et demande l'accord (« Oui, utiliser ma position »), puis le téléphone affiche sa propre demande. Si la position a déjà été autorisée, on passe directement ; si elle a été bloquée, l'appli explique comment la réactiver.
 
 Les photos des signalements sont dans un stockage Supabase **privé** (bucket « signalements », 5 Mo max par photo) : une photo peut montrer des personnes ou des plaques (TD2, risque R7). L'appli les affiche avec des liens temporaires valables 1 h, réservés aux comptes connectés.
 

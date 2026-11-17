@@ -300,6 +300,48 @@
         .map(versEcranSignalement);
     }
 
+    // ---------- Profil : historique des ramassages, score de fidélité, badges ----------
+
+    async function monProfil() {
+      var moi = await utilisateurCourant();
+      if (!moi) throw new Error('Connecte-toi pour voir ton profil.');
+      var d = donnees();
+      var sorties = d.inscriptions
+        .filter(function (i) { return i.benevole_id === moi.id; })
+        .map(function (i) {
+          var s = d.sorties.find(function (x) { return x.id === i.sortie_id; });
+          return s ? { id: s.id, titre: s.titre, lieu: s.lieu, commune: s.commune, date_debut: s.date_debut, duree_min: s.duree_min, statut: s.statut } : null;
+        });
+      var h = R.historique(sorties);
+      var nbSignalements = d.signalements.filter(function (s) { return s.auteur_id === moi.id; }).length;
+      return { profil: moi, ramassages: h.faits, aVenir: h.aVenir, bilan: R.bilanFidelite(h.faits, nbSignalements) };
+    }
+
+    // Démo uniquement : ajoute des ramassages déjà passés au compte connecté, pour montrer
+    // les badges pendant une revue (sinon il faut attendre que les sorties aient eu lieu).
+    async function ajouterRamassagesDemo(nombre) {
+      var moi = await utilisateurCourant();
+      if (!moi) throw new Error("Connecte-toi d'abord.");
+      var d = donnees();
+      var lieux = [['Plage du Moulin Blanc', 'Brest'], ['Plage du Dellec', 'Plouzané'], ['Port du Tinduff', 'Plougastel-Daoulas'], ['Plage du Passage', 'Le Relecq-Kerhuon']];
+      var deja = d.inscriptions.filter(function (i) { return i.benevole_id === moi.id; }).length;
+      for (var k = 0; k < nombre; k++) {
+        var lieu = lieux[(deja + k) % lieux.length];
+        var date = new Date();
+        date.setDate(date.getDate() - 9 * (deja + k + 1)); // une sortie tous les 9 jours environ, dans le passé
+        date.setHours(10, 0, 0, 0);
+        var s = {
+          id: nouvelId(), titre: 'Ramassage – ' + lieu[0], lieu: lieu[0], commune: lieu[1],
+          date_debut: date.toISOString(), duree_min: 120, places: 20,
+          materiel_fourni: R.avecSecurite([]), materiel_a_apporter: ['Gants'],
+          lat: null, lng: null, statut: 'prevue', organisateur_id: 'orga-demo', created_at: date.toISOString()
+        };
+        d.sorties.push(s);
+        d.inscriptions.push({ id: nouvelId(), sortie_id: s.id, benevole_id: moi.id, securite_acceptee_le: date.toISOString(), created_at: date.toISOString() });
+      }
+      sauver();
+    }
+
     // Démo uniquement : passer de bénévole à organisateur sans recréer de compte, pour les revues.
     // N'existe pas avec Supabase, où l'utilisateur ne peut pas changer son rôle lui-même.
     async function changerRoleDemo(role) {
@@ -340,6 +382,8 @@
       desinscrireDeSortie: desinscrireDeSortie,
       creerSignalement: creerSignalement,
       listerSignalements: listerSignalements,
+      monProfil: monProfil,
+      ajouterRamassagesDemo: ajouterRamassagesDemo,
       changerRoleDemo: changerRoleDemo,
       materielSecurite: R.MATERIEL_SECURITE.slice(),
       reinitialiser: reinitialiser,
