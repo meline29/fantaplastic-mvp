@@ -98,7 +98,7 @@
       noter('US2 – un organisateur crée une sortie, à son nom', creee && creee.titre === 'Nettoyage de la grève de Kerhuon' && creee.organisateur_prenom === 'Yann');
       noter('US2 – la nouvelle sortie a toutes ses places libres', creee.nb_inscrits === 0 && creee.places_restantes === 12);
       noter('US2 – le matériel tapé avec des virgules devient une liste',
-        creee.materiel_a_apporter.join('|') === 'Bottes|Une gourde' && creee.materiel_fourni.join('|') === 'Sacs poubelle|Pinces',
+        creee.materiel_a_apporter.join('|') === 'Bottes|Une gourde' && creee.materiel_fourni.join('|') === 'Gilets jaunes|Trousse de premiers secours|Sacs poubelle|Pinces',
         creee.materiel_a_apporter.join(', ') + ' / ' + creee.materiel_fourni.join(', '));
       var apres = await db.listerSortiesAVenir();
       var rangee = apres.every(function (s, i) { return i === 0 || new Date(apres[i - 1].date_debut) <= new Date(s.date_debut); });
@@ -108,6 +108,13 @@
       await doitEchouer('US2 – date passée refusée', db.creerSortie(nouvelleSortie({ date_debut: new Date(Date.now() - 3600000).toISOString() })), 'futur');
       await doitEchouer('US2 – 0 place refusée', db.creerSortie(nouvelleSortie({ places: 0 })), 'places');
       await doitEchouer('US2 – durée trop courte refusée', db.creerSortie(nouvelleSortie({ duree_min: 10 })), 'durée');
+
+      // Sécurité : l'asso fournit toujours gilets jaunes et trousse de premiers secours
+      noter('Sécurité – chaque sortie fournit gilets jaunes et trousse de premiers secours', apres.every(function (s) {
+        return s.materiel_fourni[0] === 'Gilets jaunes' && s.materiel_fourni[1] === 'Trousse de premiers secours';
+      }));
+      var avecGilets = await db.creerSortie(nouvelleSortie({ titre: 'Sortie test gilets', materiel_fourni: 'gilet jaune, sacs, trousse de premiers secours' }));
+      noter('Sécurité – pas de doublon si l\'organisateur les écrit déjà', avecGilets.materiel_fourni.join('|') === 'Gilets jaunes|Trousse de premiers secours|Sacs', avecGilets.materiel_fourni.join(', '));
 
       // Démo : bascule de rôle
       var redevenu = await db.changerRoleDemo('benevole');

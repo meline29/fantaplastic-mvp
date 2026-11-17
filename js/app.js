@@ -365,7 +365,7 @@
           <${Champ} label="Ce que les bénévoles apportent" value=${apporter} onChange=${setApporter} requis=${false}
             placeholder="Ex. : gants, bottes, une gourde" aide="Sépare les objets par des virgules" />
           <${Champ} label="Ce que l'asso apporte" value=${fourni} onChange=${setFourni} requis=${false}
-            placeholder="Ex. : sacs poubelle, pinces" aide="Sépare les objets par des virgules" />
+            placeholder="Ex. : sacs poubelle, pinces" aide=${'Sépare les objets par des virgules. Toujours ajoutés : ' + db.materielSecurite.join(' et ').toLowerCase() + '.'} />
           ${erreur ? html`<p role="alert" className="rounded-xl bg-corail/10 px-3 py-2 text-sm text-corail-fonce">${erreur}</p>` : null}
           <button type="submit" disabled=${envoi}
             className="w-full rounded-xl bg-marine px-4 py-3 font-semibold text-white transition hover:bg-marine/90 disabled:opacity-60">

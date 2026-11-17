@@ -14,6 +14,8 @@
   var ROLES_INSCRIPTION = ['benevole', 'organisateur'];
   // Rôles qui ont le droit de créer une sortie (US2)
   var ROLES_ORGANISATION = ['organisateur', 'admin'];
+  // Sécurité : l'asso fournit toujours ce matériel, à chaque sortie
+  var MATERIEL_SECURITE = ['Gilets jaunes', 'Trousse de premiers secours'];
 
   function creerDB(options) {
     var prefixe = (options && options.prefixe) || 'fantaplastic';
@@ -90,7 +92,7 @@
         var s = {
           id: nouvelId(), titre: x.titre, lieu: x.lieu, commune: x.commune,
           date_debut: dansNJours(x.j, x.h, x.m), duree_min: x.duree, places: x.places,
-          materiel_fourni: x.fourni, materiel_a_apporter: x.apporter,
+          materiel_fourni: avecSecurite(x.fourni), materiel_a_apporter: x.apporter,
           lat: x.lat, lng: x.lng, statut: 'prevue', organisateur_id: orga.id, created_at: maintenant
         };
         sorties.push(s);
@@ -126,11 +128,22 @@
         .map(function (x) { return x.charAt(0).toUpperCase() + x.slice(1); });
     }
 
+    // Met le matériel de sécurité en tête de la liste de l'asso, sans doublon
+    // ("gilet jaune" écrit par l'organisateur = "Gilets jaunes")
+    function cleObjet(x) {
+      return x.toLowerCase().replace(/s\b/g, '').trim();
+    }
+
+    function avecSecurite(liste) {
+      var cles = MATERIEL_SECURITE.map(cleObjet);
+      return MATERIEL_SECURITE.concat(liste.filter(function (o) { return cles.indexOf(cleObjet(o)) === -1; }));
+    }
+
     // Ajoute à une sortie ce que l'écran affiche : nombre d'inscrits, places restantes, matériel en liste
     function enrichir(s, d) {
       var nb = d.inscriptions.filter(function (i) { return i.sortie_id === s.id; }).length;
       return Object.assign({}, s, {
-        materiel_fourni: enListe(s.materiel_fourni),
+        materiel_fourni: avecSecurite(enListe(s.materiel_fourni)),
         materiel_a_apporter: enListe(s.materiel_a_apporter),
         nb_inscrits: nb,
         places_restantes: Math.max(0, s.places - nb)
@@ -249,7 +262,7 @@
       var s = {
         id: nouvelId(), titre: titre, lieu: lieu, commune: commune,
         date_debut: debut.toISOString(), duree_min: dureeMin, places: places,
-        materiel_fourni: fourni, materiel_a_apporter: apporter,
+        materiel_fourni: avecSecurite(fourni), materiel_a_apporter: apporter,
         lat: null, lng: null, statut: 'prevue', organisateur_id: moi.id, created_at: new Date().toISOString()
       };
       d.sorties.push(s);
@@ -293,6 +306,7 @@
       obtenirSortie: obtenirSortie,
       creerSortie: creerSortie,
       changerRoleDemo: changerRoleDemo,
+      materielSecurite: MATERIEL_SECURITE.slice(),
       reinitialiser: reinitialiser,
       _effacer: _effacer
     };

@@ -66,6 +66,7 @@
         noter('US4 – un clic sur une sortie ouvre son détail', !!doc.querySelector('main h1') && doc.querySelector('main h1').textContent.indexOf('Moulin Blanc') !== -1);
         noter('US4 – les objets à apporter par le bénévole sont indiqués', texte().indexOf('Ce que tu apportes') !== -1 && texte().indexOf('Gants de jardinage') !== -1);
         noter('US4 – les objets apportés par l\'asso sont indiqués', texte().indexOf('Ce que l\'asso apporte') !== -1 && texte().indexOf('Pinces de ramassage') !== -1);
+        noter('Sécurité – l\'asso apporte gilets jaunes et trousse de premiers secours', texte().indexOf('Gilets jaunes') !== -1 && texte().indexOf('Trousse de premiers secours') !== -1);
         bouton('Toutes les sorties').click();
         await attendreQue(function () { return doc.querySelectorAll('main li').length === 4; });
         noter('US4 – retour à la liste des sorties', doc.querySelectorAll('main li').length === 4);

@@ -19,7 +19,9 @@ create table public.sorties (
   date_debut           timestamptz not null,
   duree_min            integer not null default 120 check (duree_min between 30 and 480),
   places               integer not null check (places between 1 and 500),
-  materiel_fourni      text[] not null default '{}',   -- US4 : ce que l'asso apporte
+  -- US4 : ce que l'asso apporte. Gilets jaunes et trousse de premiers secours sont obligatoires.
+  materiel_fourni      text[] not null default array['Gilets jaunes', 'Trousse de premiers secours']
+                       check (materiel_fourni @> array['Gilets jaunes', 'Trousse de premiers secours']),
   materiel_a_apporter  text[] not null default '{}',   -- US4 : ce que chaque bénévole apporte
   lat                  double precision,
   lng                  double precision,
@@ -138,10 +140,10 @@ create policy "signalements_lecture" on public.signalements
 
 insert into public.sorties (titre, lieu, commune, date_debut, duree_min, places, materiel_fourni, materiel_a_apporter, lat, lng) values
   ('Ramassage à la plage du Moulin Blanc', 'Plage du Moulin Blanc', 'Brest', date_trunc('day', now()) + interval '3 days 10 hours', 120, 25,
-   array['Sacs poubelle', 'Pinces de ramassage', 'Seaux pour le tri'], array['Gants de jardinage', 'Chaussures fermées', 'Une gourde'], 48.3925, -4.4330),
+   array['Gilets jaunes', 'Trousse de premiers secours', 'Sacs poubelle', 'Pinces de ramassage', 'Seaux pour le tri'], array['Gants de jardinage', 'Chaussures fermées', 'Une gourde'], 48.3925, -4.4330),
   ('Nettoyage de l''anse de Sainte-Anne-du-Portzic', 'Anse de Sainte-Anne-du-Portzic', 'Brest', date_trunc('day', now()) + interval '6 days 14 hours', 90, 15,
-   array['Sacs poubelle', 'Gants'], array['Bottes', 'Un coupe-vent'], 48.3590, -4.5510),
+   array['Gilets jaunes', 'Trousse de premiers secours', 'Sacs poubelle', 'Gants'], array['Bottes', 'Un coupe-vent'], 48.3590, -4.5510),
   ('Grève du Dellec', 'Plage du Dellec', 'Plouzané', date_trunc('day', now()) + interval '10 days 9 hours 30 minutes', 120, 20,
-   array['Sacs poubelle', 'Pinces de ramassage', 'Gants'], array['Bottes', 'Une gourde', 'Des vêtements chauds'], 48.3555, -4.5680),
+   array['Gilets jaunes', 'Trousse de premiers secours', 'Sacs poubelle', 'Pinces de ramassage', 'Gants'], array['Bottes', 'Une gourde', 'Des vêtements chauds'], 48.3555, -4.5680),
   ('Ramassage au port du Tinduff', 'Port du Tinduff', 'Plougastel-Daoulas', date_trunc('day', now()) + interval '14 days 10 hours', 150, 30,
-   array['Sacs poubelle', 'Pinces de ramassage', 'Une brouette pour les gros déchets'], array['Gants', 'Bottes', 'Un en-cas'], 48.3355, -4.3720);
+   array['Gilets jaunes', 'Trousse de premiers secours', 'Sacs poubelle', 'Pinces de ramassage', 'Une brouette pour les gros déchets'], array['Gants', 'Bottes', 'Un en-cas'], 48.3355, -4.3720);
