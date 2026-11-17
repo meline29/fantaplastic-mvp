@@ -30,7 +30,7 @@
           alt=${'Badge ' + b.nom + (b.obtenu ? ' (obtenu)' : ' (pas encore obtenu)')}
           className=${'h-24 w-auto transition ' + (b.obtenu ? 'drop-shadow-md' : 'opacity-40 grayscale')} />
         <span className=${'mt-1 text-sm font-bold leading-tight ' + (b.obtenu ? 'text-marine' : 'text-slate-400')}>${b.nom}</span>
-        <span className="text-xs text-slate-500">${b.obtenu ? 'Obtenu' : 'Dès ' + pluriel(b.seuil, 'ramassage')}</span>
+        <span className="text-xs text-slate-500">${props.legende || (b.obtenu ? 'Obtenu' : 'Dès ' + pluriel(b.seuil, 'ramassage'))}</span>
       </li>`;
   }
 
@@ -125,8 +125,13 @@
             aria-valuemin="0" aria-valuemax="100" aria-valuenow=${avancement}>
             <div className="h-full rounded-full bg-lagon" style=${{ width: avancement + '%' }}></div>
           </div>
-          <ul className="mt-4 grid grid-cols-3 gap-x-2 gap-y-4 sm:grid-cols-5" aria-label="Badges">
+          <h3 className="mt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Badges de ramassage</h3>
+          <ul className="mt-2 grid grid-cols-3 gap-x-2 gap-y-4 sm:grid-cols-5" aria-label="Badges de ramassage">
             ${b.badges.map(function (badge) { return html`<${Badge} key=${badge.id} badge=${badge} />`; })}
+          </ul>
+          <h3 className="mt-5 text-sm font-semibold uppercase tracking-wide text-slate-500">Badges spéciaux</h3>
+          <ul className="mt-2 grid grid-cols-3 gap-x-2 gap-y-4" aria-label="Badges spéciaux">
+            ${donnees.speciaux.map(function (badge) { return html`<${Badge} key=${badge.id} badge=${badge} legende=${badge.legende} />`; })}
           </ul>
         </${Carte}>
 

@@ -105,6 +105,25 @@
       sel: 'demo-sel-nolwenn-2026', empreinte: 'bf3defd098638de042ecbf6ed2cc78bd02e5635bed5a1d302fc858488f674a61'
     };
 
+    // Le compte de démo a aussi participé au ramassage de la Sainte-Anne (sept. 2026) → badge spécial
+    function ajouterEvenementDemo(d) {
+      var deja = d.inscriptions.some(function (i) {
+        if (i.benevole_id !== COMPTE_DEMO.id) return false;
+        var s = d.sorties.find(function (x) { return x.id === i.sortie_id; });
+        return s && /Sainte-Anne/.test(s.titre) && new Date(s.date_debut).getFullYear() === 2026;
+      });
+      if (deja || !d.profiles.some(function (p) { return p.id === COMPTE_DEMO.id; })) return false;
+      var date = new Date(2026, 8, 12, 10, 0, 0).toISOString(); // samedi 12 septembre 2026, 10h
+      var s = {
+        id: nouvelId(), titre: 'Ramassage de la Sainte-Anne – Anse de Sainte-Anne-du-Portzic', lieu: 'Anse de Sainte-Anne-du-Portzic', commune: 'Brest',
+        date_debut: date, duree_min: 180, places: 60, materiel_fourni: R.avecSecurite(['Sacs poubelle', 'Pinces de ramassage']), materiel_a_apporter: ['Gants', 'Bottes'],
+        lat: 48.3590, lng: -4.5510, statut: 'prevue', organisateur_id: 'orga-demo', created_at: date
+      };
+      d.sorties.push(s);
+      d.inscriptions.push({ id: nouvelId(), sortie_id: s.id, benevole_id: COMPTE_DEMO.id, securite_acceptee_le: date, created_at: date });
+      return true;
+    }
+
     function ajouterCompteDemo(d) {
       if (d.profiles.some(function (p) { return p.id === COMPTE_DEMO.id || p.email === COMPTE_DEMO.email; })) return false;
       var membreDepuis = new Date();
@@ -147,7 +166,9 @@
           ecrire(CLE_DB, cache);
         }
         if (!cache.signalements) cache.signalements = []; // données enregistrées avant les signalements
-        if (ajouterCompteDemo(cache)) ecrire(CLE_DB, cache); // aussi pour les navigateurs qui avaient déjà la démo
+        var ajoutCompte = ajouterCompteDemo(cache); // aussi pour les navigateurs qui avaient déjà la démo
+        var ajoutEvenement = ajouterEvenementDemo(cache);
+        if (ajoutCompte || ajoutEvenement) ecrire(CLE_DB, cache);
       }
       return cache;
     }
@@ -357,7 +378,12 @@
         });
       var h = R.historique(sorties);
       var nbSignalements = d.signalements.filter(function (s) { return s.auteur_id === moi.id; }).length;
-      return { profil: moi, ramassages: h.faits, aVenir: h.aVenir, bilan: R.bilanFidelite(h.faits, nbSignalements) };
+      var nbSortiesOrganisees = d.sorties.filter(function (s) { return s.organisateur_id === moi.id && s.statut !== 'annulee'; }).length;
+      return {
+        profil: moi, ramassages: h.faits, aVenir: h.aVenir,
+        bilan: R.bilanFidelite(h.faits, nbSignalements),
+        speciaux: R.badgesSpeciaux({ ramassages: h.faits, role: moi.role, nbSortiesOrganisees: nbSortiesOrganisees })
+      };
     }
 
     // Démo uniquement : ajoute des ramassages déjà passés au compte connecté, pour montrer

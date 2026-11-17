@@ -238,8 +238,9 @@
         // Profil : historique, score de fidélité, badges
         bouton('Profil').click();
         await attendreQue(function () { return texte().indexOf('Score de fidélité') !== -1; });
-        noter('Profil – prénom, score de fidélité et les 5 badges', !!doc.querySelector('main h1') && doc.querySelector('main h1').textContent === 'Mon profil'
-          && texte().indexOf('Lou') !== -1 && doc.querySelectorAll('main img[src^="assets/badges/"]').length === 5);
+        noter('Profil – prénom, score de fidélité, 5 badges de ramassage et 3 badges spéciaux', !!doc.querySelector('main h1') && doc.querySelector('main h1').textContent === 'Mon profil'
+          && texte().indexOf('Lou') !== -1 && doc.querySelectorAll('main img[src^="assets/badges/"]').length === 8
+          && texte().indexOf('Événement Sainte-Anne') !== -1 && texte().indexOf('Bénévole fidèle') !== -1 && texte().indexOf('Super organisateur') !== -1);
         noter('Profil – aucun badge sans ramassage passé', doc.querySelectorAll('main img[alt$="(obtenu)"]').length === 0);
         noter('Profil – le signalement compte dans le score', texte().indexOf('1 signalement de déchets') !== -1);
         noter('Profil – la sortie à venir de Lou est dans « Mes prochaines sorties »', texte().indexOf('Mes prochaines sorties (1)') !== -1 && texte().indexOf('Ramassage à la plage du Moulin Blanc') !== -1);

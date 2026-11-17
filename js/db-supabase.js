@@ -229,7 +229,13 @@
     var h = R.historique(lignes.map(function (l) { return l.sortie; }));
     var compte = await sb.from('signalements').select('id', { count: 'exact', head: true }).eq('auteur_id', moi.id);
     var nbSignalements = compte.error ? 0 : (compte.count || 0);
-    return { profil: moi, ramassages: h.faits, aVenir: h.aVenir, bilan: R.bilanFidelite(h.faits, nbSignalements) };
+    var organisees = await sb.from('sorties').select('id', { count: 'exact', head: true }).eq('organisateur_id', moi.id).neq('statut', 'annulee');
+    var nbSortiesOrganisees = organisees.error ? 0 : (organisees.count || 0);
+    return {
+      profil: moi, ramassages: h.faits, aVenir: h.aVenir,
+      bilan: R.bilanFidelite(h.faits, nbSignalements),
+      speciaux: R.badgesSpeciaux({ ramassages: h.faits, role: moi.role, nbSortiesOrganisees: nbSortiesOrganisees })
+    };
   }
 
   // Pas de bascule de rôle ni de remise à zéro ici : ce sont des outils de la démo locale.

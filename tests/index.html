@@ -186,6 +186,23 @@
       var b3 = regles.bilanFidelite([{ date_debut: '2026-09-05T08:00:00Z' }, { date_debut: '2026-09-20T08:00:00Z' }, { date_debut: '2026-10-03T08:00:00Z' }], 4);
       noter('Profil – score : 10 pts par ramassage, 2 par signalement, 5 par mois actif', b3.score === 30 + 8 + 10, b3.score + ' points');
 
+      // Badges spéciaux
+      function ilYa(annees) { var d = new Date(); d.setFullYear(d.getFullYear() - annees); return d.toISOString(); }
+      var saintAnneSept = { titre: "Nettoyage de l'anse de Sainte-Anne-du-Portzic", lieu: 'Anse de Sainte-Anne-du-Portzic', date_debut: new Date(2026, 8, 12, 10).toISOString() };
+      var saintAnneOct = { titre: "Nettoyage de l'anse de Sainte-Anne-du-Portzic", lieu: 'Anse de Sainte-Anne-du-Portzic', date_debut: new Date(2026, 9, 3, 10).toISOString() };
+      var dellecSept = { titre: 'Grève du Dellec', lieu: 'Plage du Dellec', date_debut: new Date(2026, 8, 19, 10).toISOString() };
+      var sp = regles.badgesSpeciaux({ ramassages: [saintAnneSept], role: 'benevole', nbSortiesOrganisees: 0 });
+      noter('Spécial – ramassage à Sainte-Anne en sept. 2026 : Événement Sainte-Anne', sp[0].obtenu === true && sp[1].obtenu === false && sp[2].obtenu === false);
+      noter('Spécial – Sainte-Anne en octobre, ou autre plage en septembre : pas de badge',
+        regles.badgesSpeciaux({ ramassages: [saintAnneOct, dellecSept], role: 'benevole' })[0].obtenu === false);
+      var vieux = regles.badgesSpeciaux({ ramassages: [{ titre: 'Grève du Dellec', lieu: 'Plage du Dellec', date_debut: ilYa(6) }], role: 'benevole' });
+      var recent = regles.badgesSpeciaux({ ramassages: [{ titre: 'Grève du Dellec', lieu: 'Plage du Dellec', date_debut: ilYa(4) }], role: 'benevole' });
+      noter('Spécial – premier ramassage il y a 6 ans : Bénévole fidèle ; 4 ans : pas encore', vieux[1].obtenu === true && recent[1].obtenu === false && recent[1].legende.indexOf('Bénévole depuis 4 ans') === 0, recent[1].legende);
+      var orga5 = regles.badgesSpeciaux({ ramassages: [], role: 'organisateur', nbSortiesOrganisees: 5 });
+      var orga4 = regles.badgesSpeciaux({ ramassages: [], role: 'organisateur', nbSortiesOrganisees: 4 });
+      var benev = regles.badgesSpeciaux({ ramassages: [], role: 'benevole', nbSortiesOrganisees: 10 });
+      noter('Spécial – Super organisateur : organisateur avec 5 sorties organisées', orga5[2].obtenu === true && orga4[2].obtenu === false && orga4[2].legende === '4 sur 5 sorties organisées' && benev[2].obtenu === false && benev[2].legende === 'Réservé aux organisateurs');
+
       var profilLou = await db.monProfil();
       noter('Profil – sans ramassage passé : 0 ramassage, le signalement est compté', profilLou.profil.prenom === 'Lou' && profilLou.bilan.nbRamassages === 0 && profilLou.bilan.nbSignalements === 1);
       await db.ajouterRamassagesDemo(5);
@@ -200,10 +217,11 @@
       // Compte de démo (identifiant et mot de passe dans le README)
       var demo = await db.connecter({ email: 'demo@fantaplastic.fr', motDePasse: 'Sardine-Plastic-29' });
       var profilDemo = await db.monProfil();
-      noter('Compte démo – connexion, 23 ramassages : Sardine, Cabillaud et Poulpe, et une sortie à venir',
-        demo.prenom === 'Nolwenn (démo)' && profilDemo.bilan.nbRamassages === 23
+      noter('Compte démo – connexion, 24 ramassages : Sardine, Cabillaud et Poulpe, et une sortie à venir',
+        demo.prenom === 'Nolwenn (démo)' && profilDemo.bilan.nbRamassages === 24
           && obtenus(profilDemo.bilan) === 'Sardine Plastic, Cabillaud Bouteille, Poulpe Bouchon' && profilDemo.aVenir.length === 1,
         profilDemo.bilan.score + ' points, ' + obtenus(profilDemo.bilan));
+      noter('Compte démo – badge spécial Événement Sainte-Anne obtenu', profilDemo.speciaux[0].obtenu === true && profilDemo.speciaux[2].legende === 'Réservé aux organisateurs');
       await db.deconnecter();
 
       db._effacer();

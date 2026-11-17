@@ -196,7 +196,52 @@
     };
   }
 
+  // ---------- Badges spéciaux (qualitatifs) ----------
+  // - Événement Sainte-Anne : un ramassage à Sainte-Anne(-du-Portzic) en septembre 2026
+  // - Bénévole fidèle       : 5 ans depuis son premier ramassage
+  // - Super organisateur    : être organisateur et avoir organisé au moins 5 sorties
+
+  var SUPER_ORGANISATEUR_MIN = 5;
+  var ANNEES_FIDELITE = 5;
+
+  function dureeDepuis(date) {
+    // en mois du calendrier (du 12 mars au 12 avril = 1 mois)
+    var debut = new Date(date), maintenant = new Date();
+    var mois = (maintenant.getFullYear() - debut.getFullYear()) * 12 + (maintenant.getMonth() - debut.getMonth())
+      - (maintenant.getDate() < debut.getDate() ? 1 : 0);
+    mois = Math.max(0, mois);
+    if (mois < 12) return mois + ' mois';
+    var ans = Math.floor(mois / 12);
+    return ans + ' an' + (ans > 1 ? 's' : '') + (mois % 12 ? ' et ' + (mois % 12) + ' mois' : '');
+  }
+
+  // infos = { ramassages: [{ titre, lieu, date_debut }], role, nbSortiesOrganisees }
+  function badgesSpeciaux(infos) {
+    var ramassages = infos.ramassages || [];
+    var saintAnne = ramassages.some(function (r) {
+      var d = new Date(r.date_debut);
+      return /sainte[- ]anne/i.test((r.titre || '') + ' ' + (r.lieu || '')) && d.getFullYear() === 2026 && d.getMonth() === 8;
+    });
+    var premier = ramassages.reduce(function (min, r) {
+      var t = new Date(r.date_debut).getTime();
+      return min === null || t < min ? t : min;
+    }, null);
+    var fidele = premier !== null && Date.now() - premier >= ANNEES_FIDELITE * 365.25 * 86400000;
+    var estOrga = ROLES_ORGANISATION.indexOf(infos.role) !== -1;
+    var nbOrga = infos.nbSortiesOrganisees || 0;
+    var superOrga = estOrga && nbOrga >= SUPER_ORGANISATEUR_MIN;
+    return [
+      { id: 'evenement-sainte-anne', nom: 'Événement Sainte-Anne', obtenu: saintAnne,
+        legende: saintAnne ? 'Obtenu' : 'Ramassage de la Sainte-Anne, sept. 2026' },
+      { id: 'benevole-fidele', nom: 'Bénévole fidèle', obtenu: fidele,
+        legende: fidele ? 'Obtenu' : premier === null ? '5 ans de bénévolat' : 'Bénévole depuis ' + dureeDepuis(premier) + ', dès 5 ans' },
+      { id: 'super-organisateur', nom: 'Super organisateur', obtenu: superOrga,
+        legende: superOrga ? 'Obtenu' : estOrga ? nbOrga + ' sur ' + SUPER_ORGANISATEUR_MIN + ' sorties organisées' : 'Réservé aux organisateurs' }
+    ];
+  }
+
   window.FantaRegles = {
+    badgesSpeciaux: badgesSpeciaux,
     BADGES: BADGES,
     POINTS: POINTS,
     historique: historique,
