@@ -8,8 +8,8 @@ Application web (PWA) pour les bénévoles ramasseurs de la rade de Brest.
 - **Ou avec un petit serveur :** `python -m http.server 8000` dans ce dossier, puis ouvrir http://localhost:8000
 
 Les tests s'ouvrent de la même façon :
-- `tests/index.html` : 20 tests de la couche de données (comptes, rôles, liste des sorties) ;
-- `tests/ui.html` : rejoue le parcours dans l'appli, en 19 étapes (sorties, création de compte avec choix du rôle, onglets, connexion). **Attention, il remet les données de démo à zéro.**
+- `tests/index.html` : 39 tests de la couche de données (comptes, rôles, liste et fiche des sorties, création d'une sortie) ;
+- `tests/ui.html` : rejoue le parcours dans l'appli, en 31 étapes (sorties, fiche d'une sortie, création de compte organisateur, création d'une sortie, bascule de rôle, onglets, connexion). **Attention, il remet les données de démo à zéro.**
 
 ## Revenir à une version précédente (git)
 
@@ -26,7 +26,7 @@ git switch main                # revenir à la dernière version
 | Fichier | Rôle |
 |---|---|
 | `index.html` | page unique, charge React 18, htm (JSX sans compilation) et Tailwind |
-| `js/app.js` | les écrans : en-tête, accueil, liste des sorties, formulaires de compte |
+| `js/app.js` | les écrans : en-tête, accueil, liste et fiche des sorties, création d'une sortie, formulaires de compte, onglets |
 | `js/db.js` | la couche de données. Pour l'instant en « démo locale » (stockage du navigateur), avec les mêmes fonctions que celles qu'on aura avec Supabase |
 | `supabase/schema.sql` | tables, règles d'accès (RLS) et sorties d'exemple pour Supabase |
 | `manifest.webmanifest`, `assets/` | icônes et logo, pour installer l'appli sur un téléphone |
@@ -46,7 +46,20 @@ Objectif proposé : *un bénévole peut créer son compte, se connecter et voir 
 
 Ce qui reste à décider en équipe : la Definition of Done (une US branchée sur le stockage local compte-t-elle comme « finie » ?) et la suite du backlog.
 
-## Depuis la fin du sprint 1
+## Entre le sprint 1 et le sprint 2
 
 - À la création du compte, on choisit son rôle : **bénévole** (par défaut) ou **organisateur**. Plus tard, un compte organisateur devra être validé par l'asso (TD2, R7).
 - Barre d'onglets en bas de l'écran : **Sorties**, **Carte**, **Signaler**, **Profil** (badges et profil). Seul « Sorties » a du contenu, les autres onglets sont prêts mais vides.
+
+## Sprint 2 : ce qui a été codé
+
+| Élément | Points (TD1) | État |
+|---|---|---|
+| US2 – Créer une sortie | 3 | Fait en mode démo locale : en organisateur, bouton « Créer une sortie » (titre, lieu, commune, date, heure, durée, places, matériel). Contrôles : date dans le futur, 1 à 500 places, 30 min à 8 h. La sortie apparaît tout de suite dans la liste. |
+| US4 – Matériel à prévoir | 2 | Fait : un clic sur une sortie ouvre sa fiche avec « Ce que tu apportes » et « Ce que l'asso apporte ». |
+
+En plus :
+- **Démo · rôle** : une fois connecté, une bascule bénévole / organisateur en haut de la liste permet de tester les deux modes sans recréer de compte (pratique pour les revues croisées). Elle n'existera plus avec Supabase, où l'utilisateur ne peut pas changer son rôle lui-même.
+- La phrase grise « MVP · données de démonstration… » est de nouveau affichée en bas des écrans de connexion et d'inscription.
+
+Toujours pas fait : le branchement sur Supabase (T2) et l'inscription à une sortie (US14).

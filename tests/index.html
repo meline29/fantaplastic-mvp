@@ -79,6 +79,42 @@
       var reco = await db.connecter({ email: 'LOU@exemple.fr', motDePasse: 'motdepasse1' });
       noter('US15 – reconnexion (email insensible à la casse)', reco.id === profil.id);
 
+      // US2
+      function nouvelleSortie(modifs) {
+        var jour = new Date();
+        jour.setDate(jour.getDate() + 20);
+        jour.setHours(9, 30, 0, 0);
+        return Object.assign({
+          titre: 'Nettoyage de la grève de Kerhuon', lieu: 'Plage du Passage', commune: 'Le Relecq-Kerhuon',
+          date_debut: jour.toISOString(), duree_min: 90, places: 12,
+          materiel_a_apporter: ' bottes , une gourde,,', materiel_fourni: 'sacs poubelle; pinces'
+        }, modifs || {});
+      }
+      await doitEchouer('US2 – un bénévole ne peut pas créer de sortie', db.creerSortie(nouvelleSortie()), 'organisateurs');
+      await db.deconnecter();
+      await doitEchouer('US2 – il faut être connecté pour créer une sortie', db.creerSortie(nouvelleSortie()), 'Connecte-toi');
+      await db.connecter({ email: 'yann@exemple.fr', motDePasse: 'motdepasse2' });
+      var creee = await db.creerSortie(nouvelleSortie());
+      noter('US2 – un organisateur crée une sortie, à son nom', creee && creee.titre === 'Nettoyage de la grève de Kerhuon' && creee.organisateur_prenom === 'Yann');
+      noter('US2 – la nouvelle sortie a toutes ses places libres', creee.nb_inscrits === 0 && creee.places_restantes === 12);
+      noter('US2 – le matériel tapé avec des virgules devient une liste',
+        creee.materiel_a_apporter.join('|') === 'Bottes|Une gourde' && creee.materiel_fourni.join('|') === 'Sacs poubelle|Pinces',
+        creee.materiel_a_apporter.join(', ') + ' / ' + creee.materiel_fourni.join(', '));
+      var apres = await db.listerSortiesAVenir();
+      var rangee = apres.every(function (s, i) { return i === 0 || new Date(apres[i - 1].date_debut) <= new Date(s.date_debut); });
+      noter('US2 – la nouvelle sortie apparaît dans la liste, à sa date', apres.length === 5 && rangee && apres.some(function (s) { return s.id === creee.id; }));
+      await doitEchouer('US2 – titre vide refusé', db.creerSortie(nouvelleSortie({ titre: '  ' })), 'titre');
+      await doitEchouer('US2 – date manquante refusée', db.creerSortie(nouvelleSortie({ date_debut: null })), 'date');
+      await doitEchouer('US2 – date passée refusée', db.creerSortie(nouvelleSortie({ date_debut: new Date(Date.now() - 3600000).toISOString() })), 'futur');
+      await doitEchouer('US2 – 0 place refusée', db.creerSortie(nouvelleSortie({ places: 0 })), 'places');
+      await doitEchouer('US2 – durée trop courte refusée', db.creerSortie(nouvelleSortie({ duree_min: 10 })), 'durée');
+
+      // Démo : bascule de rôle
+      var redevenu = await db.changerRoleDemo('benevole');
+      noter('Démo – on peut repasser en bénévole', redevenu.role === 'benevole' && (await db.utilisateurCourant()).role === 'benevole');
+      await doitEchouer('Démo – redevenu bénévole, on ne peut plus créer de sortie', db.creerSortie(nouvelleSortie()), 'organisateurs');
+      await doitEchouer('Démo – la bascule refuse le rôle admin', db.changerRoleDemo('admin'), 'bénévole ou organisateur');
+
       db._effacer();
       document.getElementById('resume').textContent = nbOk + ' test(s) OK, ' + nbKo + ' en échec';
       document.getElementById('resume').className = nbKo ? 'ko' : 'ok';

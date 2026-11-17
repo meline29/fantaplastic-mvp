@@ -40,6 +40,12 @@
       function bouton(libelle) {
         return Array.from(doc.querySelectorAll('button')).find(function (b) { return b.textContent.replace(/[‹›+]/g, '').trim() === libelle; });
       }
+      function choisir(label, valeur) {
+        var liste = Array.from(doc.querySelectorAll('label')).find(function (l) { return l.textContent.indexOf(label) === 0; }).querySelector('select');
+        var setter = Object.getOwnPropertyDescriptor(win.HTMLSelectElement.prototype, 'value').set;
+        setter.call(liste, valeur);
+        liste.dispatchEvent(new win.Event('change', { bubbles: true }));
+      }
       function saisir(label, valeur) {
         var champ = Array.from(doc.querySelectorAll('label')).find(function (l) { return l.textContent.indexOf(label) === 0; }).querySelector('input');
         var setter = Object.getOwnPropertyDescriptor(win.HTMLInputElement.prototype, 'value').set;
@@ -88,8 +94,42 @@
         await attendreQue(function () { return !!bouton('Déconnexion'); });
         noter('US15 – compte créé et connecté (bouton Déconnexion)', !!bouton('Déconnexion'));
         noter('US15 – message de bienvenue avec le prénom', texte().indexOf('Bienvenue Lou') !== -1);
-        noter('US15 – le compte créé est bien organisateur', texte().indexOf('compte organisateur est créé') !== -1 && texte().indexOf('Organisateur') !== -1);
+        var roleActif = doc.querySelector('[aria-pressed="true"]');
+        noter('US15 – le compte créé est bien organisateur', texte().indexOf('compte organisateur est créé') !== -1 && !!roleActif && roleActif.textContent.trim() === 'Organisateur');
         noter('US3 – la liste reste visible une fois connecté', doc.querySelectorAll('main li').length === 4);
+
+        // US2 : en organisateur, on crée une sortie
+        noter('US2 – en organisateur, le bouton « Créer une sortie » est là', !!bouton('Créer une sortie'));
+        bouton('Créer une sortie').click();
+        await attendreQue(function () { return texte().indexOf('Nouvelle sortie') !== -1; });
+        bouton('Publier la sortie').click();
+        await attendreQue(function () { return !!doc.querySelector('[role=alert]'); });
+        noter('US2 – formulaire vide : message d\'erreur', !!doc.querySelector('[role=alert]') && doc.querySelector('[role=alert]').textContent.indexOf('titre') !== -1);
+        var jour = new Date();
+        jour.setDate(jour.getDate() + 20);
+        var jourIso = jour.getFullYear() + '-' + String(jour.getMonth() + 1).padStart(2, '0') + '-' + String(jour.getDate()).padStart(2, '0');
+        saisir('Titre de la sortie', 'Nettoyage de la grève de Kerhuon');
+        saisir('Lieu de rendez-vous', 'Plage du Passage');
+        saisir('Commune', 'Le Relecq-Kerhuon');
+        saisir('Date', jourIso);
+        saisir('Heure', '09:30');
+        choisir('Durée', '90');
+        saisir('Places', '12');
+        saisir('Ce que les bénévoles apportent', 'bottes, une gourde');
+        saisir("Ce que l'asso apporte", 'sacs poubelle, pinces');
+        bouton('Publier la sortie').click();
+        await attendreQue(function () { return !!doc.querySelector('main h1') && doc.querySelector('main h1').textContent === 'Nettoyage de la grève de Kerhuon'; });
+        noter('US2 – la sortie est publiée et sa fiche s\'ouvre', !!doc.querySelector('main h1') && doc.querySelector('main h1').textContent === 'Nettoyage de la grève de Kerhuon');
+        noter('US2 – la fiche reprend le matériel saisi', texte().indexOf('Une gourde') !== -1 && texte().indexOf('Pinces') !== -1);
+        noter('US2 – la fiche indique 12 places et 1 h 30', texte().indexOf('0 inscrit sur 12 places') !== -1 && texte().indexOf('(1 h 30)') !== -1);
+        bouton('Toutes les sorties').click();
+        await attendreQue(function () { return doc.querySelectorAll('main li').length === 5; });
+        noter('US2 – la nouvelle sortie est dans la liste', doc.querySelectorAll('main li').length === 5 && texte().indexOf('Nettoyage de la grève de Kerhuon') !== -1);
+
+        // Démo : on repasse en bénévole, le bouton Créer disparaît
+        bouton('Bénévole').click();
+        await attendreQue(function () { return !bouton('Créer une sortie'); });
+        noter('Démo – en bénévole, le bouton « Créer une sortie » disparaît', !bouton('Créer une sortie'));
 
         // Onglets : seul "Sorties" a du contenu pour l'instant
         var libelles = Array.from(doc.querySelectorAll('nav button')).map(function (b) { return b.textContent.trim(); });
@@ -102,8 +142,8 @@
           noter('Onglets – « ' + nom + ' » s\'ouvre et reste vide', titreOk && doc.querySelectorAll('main li').length === 0);
         }
         bouton('Sorties').click();
-        await attendreQue(function () { return doc.querySelectorAll('main li').length === 4; });
-        noter('Onglets – retour sur « Sorties » : la liste est là', doc.querySelectorAll('main li').length === 4);
+        await attendreQue(function () { return doc.querySelectorAll('main li').length === 5; });
+        noter('Onglets – retour sur « Sorties » : la liste est là', doc.querySelectorAll('main li').length === 5);
 
         bouton('Déconnexion').click();
         await attendreQue(function () { return !!bouton('Se connecter'); });

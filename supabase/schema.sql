@@ -13,12 +13,12 @@ create table public.profiles (
 
 create table public.sorties (
   id                   uuid primary key default gen_random_uuid(),
-  titre                text not null,
+  titre                text not null check (char_length(titre) between 1 and 80),
   lieu                 text not null,
   commune              text not null,
   date_debut           timestamptz not null,
-  duree_min            integer not null default 120 check (duree_min > 0),
-  places               integer not null check (places > 0),
+  duree_min            integer not null default 120 check (duree_min between 30 and 480),
+  places               integer not null check (places between 1 and 500),
   materiel_fourni      text[] not null default '{}',   -- US4 : ce que l'asso apporte
   materiel_a_apporter  text[] not null default '{}',   -- US4 : ce que chaque bénévole apporte
   lat                  double precision,
@@ -104,7 +104,8 @@ alter table public.signalements enable row level security;
 create policy "profils_lecture" on public.profiles
   for select using (id = auth.uid() or public.mon_role() in ('organisateur', 'admin'));
 
--- On ne peut modifier que son prénom (pas son rôle)
+-- On ne peut modifier que son prénom (pas son rôle). La bascule « Démo · rôle » de
+-- l'appli n'existe donc qu'en démo locale : à retirer quand on branche Supabase.
 create policy "profils_modif_perso" on public.profiles
   for update using (id = auth.uid()) with check (id = auth.uid());
 revoke update on public.profiles from authenticated;
@@ -113,8 +114,9 @@ grant update (prenom) on public.profiles to authenticated;
 -- Sorties : visibles par tout le monde, gérées par les organisateurs
 create policy "sorties_lecture" on public.sorties
   for select using (true);
+-- US2 : un organisateur crée une sortie, à son nom
 create policy "sorties_creation" on public.sorties
-  for insert with check (public.mon_role() in ('organisateur', 'admin'));
+  for insert with check (public.mon_role() in ('organisateur', 'admin') and organisateur_id = auth.uid());
 create policy "sorties_modif" on public.sorties
   for update using (public.mon_role() in ('organisateur', 'admin'));
 

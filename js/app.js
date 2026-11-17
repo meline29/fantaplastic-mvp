@@ -37,6 +37,15 @@
     return html`<svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`;
   }
 
+  // Date du jour au format des champs <input type="date"> : "2026-11-17"
+  function dateLocale(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function IconePlus() {
+    return html`<svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>`;
+  }
+
   function IconeChevron() {
     return html`<svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6"/></svg>`;
   }
@@ -155,20 +164,38 @@
 
   // ---------- US15 : créer un compte / se connecter ----------
 
+  var CLASSE_CHAMP = 'mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-900 outline-none placeholder:text-slate-400 focus:border-lagon focus:ring-2 focus:ring-lagon/30';
+
   function Champ(props) {
     return html`
       <label className="block">
         <span className="text-sm font-medium text-marine">${props.label}</span>
         <input
-          className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-900 outline-none focus:border-lagon focus:ring-2 focus:ring-lagon/30"
+          className=${CLASSE_CHAMP}
           type=${props.type || 'text'}
           value=${props.value}
           onChange=${function (e) { props.onChange(e.target.value); }}
           autoComplete=${props.autoComplete}
-          required=${true}
+          required=${props.requis !== false}
           minLength=${props.minLength}
+          maxLength=${props.maxLength}
+          min=${props.min}
+          max=${props.max}
+          placeholder=${props.placeholder}
+          inputMode=${props.inputMode}
+          list=${props.list}
         />
         ${props.aide ? html`<span className="mt-1 block text-xs text-slate-500">${props.aide}</span>` : null}
+      </label>`;
+  }
+
+  function ChampListe(props) {
+    return html`
+      <label className="block">
+        <span className="text-sm font-medium text-marine">${props.label}</span>
+        <select className=${CLASSE_CHAMP} value=${props.value} onChange=${function (e) { props.onChange(e.target.value); }}>
+          ${props.options.map(function (o) { return html`<option key=${o.valeur} value=${o.valeur}>${o.titre}</option>`; })}
+        </select>
       </label>`;
   }
 
@@ -257,6 +284,100 @@
       </section>`;
   }
 
+  // Démo : passer de bénévole à organisateur sans recréer de compte (pratique pour les revues croisées)
+  function BasculeRole(props) {
+    return html`
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wider text-marine/70">Démo · rôle</span>
+        <div role="group" aria-label="Changer de rôle (démo)" className="inline-flex rounded-full bg-white p-1 ring-1 ring-marine/10">
+          ${ROLES.map(function (o) {
+            var actif = props.role === o.valeur;
+            return html`
+              <button key=${o.valeur} type="button" aria-pressed=${actif} onClick=${function () { if (!actif) props.onChanger(o.valeur); }}
+                className=${'rounded-full px-3 py-1 text-sm font-semibold transition ' + (actif ? 'bg-marine text-white' : 'text-marine hover:bg-marine/5')}>
+                ${o.titre}
+              </button>`;
+          })}
+        </div>
+      </div>`;
+  }
+
+  // ---------- US2 : un organisateur crée une sortie ----------
+
+  var DUREES = [
+    { valeur: '60', titre: '1 h' }, { valeur: '90', titre: '1 h 30' }, { valeur: '120', titre: '2 h' },
+    { valeur: '150', titre: '2 h 30' }, { valeur: '180', titre: '3 h' }, { valeur: '240', titre: '4 h' }
+  ];
+
+  // Communes autour de la rade, proposées pendant la saisie (on peut quand même en taper une autre)
+  var COMMUNES = ['Brest', 'Plouzané', 'Guipavas', 'Le Relecq-Kerhuon', 'Plougastel-Daoulas', 'Logonna-Daoulas',
+    'Daoulas', "L'Hôpital-Camfrout", 'Landévennec', 'Crozon', 'Roscanvel', 'Lanvéoc', 'Landerneau'];
+
+  function FormulaireSortie(props) {
+    var _t = useState(''), titre = _t[0], setTitre = _t[1];
+    var _l = useState(''), lieu = _l[0], setLieu = _l[1];
+    var _c = useState(''), commune = _c[0], setCommune = _c[1];
+    var _j = useState(''), jour = _j[0], setJour = _j[1];
+    var _h = useState('10:00'), heureDebut = _h[0], setHeureDebut = _h[1];
+    var _d = useState('120'), dureeMin = _d[0], setDureeMin = _d[1];
+    var _p = useState('20'), places = _p[0], setPlaces = _p[1];
+    var _a = useState(''), apporter = _a[0], setApporter = _a[1];
+    var _f = useState(''), fourni = _f[0], setFourni = _f[1];
+    var _err = useState(''), erreur = _err[0], setErreur = _err[1];
+    var _env = useState(false), envoi = _env[0], setEnvoi = _env[1];
+
+    async function valider(e) {
+      e.preventDefault();
+      setErreur('');
+      setEnvoi(true);
+      try {
+        var debut = jour && heureDebut ? new Date(jour + 'T' + heureDebut) : null;
+        var sortie = await db.creerSortie({
+          titre: titre, lieu: lieu, commune: commune,
+          date_debut: debut && !isNaN(debut.getTime()) ? debut.toISOString() : null,
+          duree_min: Number(dureeMin), places: Number(places),
+          materiel_a_apporter: apporter, materiel_fourni: fourni
+        });
+        props.onCreee(sortie);
+      } catch (err) {
+        setErreur(err.message);
+        setEnvoi(false);
+      }
+    }
+
+    return html`
+      <section className="mx-auto max-w-md rounded-2xl bg-white p-6 shadow-sm ring-1 ring-marine/10">
+        <h2 className="text-xl font-bold text-marine">Nouvelle sortie</h2>
+        <p className="mt-1 text-sm text-slate-600">Elle apparaîtra tout de suite dans la liste des bénévoles.</p>
+        <form className="mt-5 space-y-4" onSubmit=${valider} noValidate=${true}>
+          <${Champ} label="Titre de la sortie" value=${titre} onChange=${setTitre} maxLength=${80} placeholder="Ex. : Ramassage au Moulin Blanc" />
+          <${Champ} label="Lieu de rendez-vous" value=${lieu} onChange=${setLieu} placeholder="Ex. : Parking du Moulin Blanc" />
+          <${Champ} label="Commune" value=${commune} onChange=${setCommune} list="communes-rade" placeholder="Ex. : Brest" />
+          <datalist id="communes-rade">${COMMUNES.map(function (c) { return html`<option key=${c} value=${c} />`; })}</datalist>
+          <div className="grid grid-cols-2 gap-3">
+            <${Champ} label="Date" type="date" value=${jour} onChange=${setJour} min=${dateLocale(new Date())} />
+            <${Champ} label="Heure" type="time" value=${heureDebut} onChange=${setHeureDebut} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <${ChampListe} label="Durée" value=${dureeMin} onChange=${setDureeMin} options=${DUREES} />
+            <${Champ} label="Places" type="number" value=${places} onChange=${setPlaces} min=${1} max=${500} inputMode="numeric" />
+          </div>
+          <${Champ} label="Ce que les bénévoles apportent" value=${apporter} onChange=${setApporter} requis=${false}
+            placeholder="Ex. : gants, bottes, une gourde" aide="Sépare les objets par des virgules" />
+          <${Champ} label="Ce que l'asso apporte" value=${fourni} onChange=${setFourni} requis=${false}
+            placeholder="Ex. : sacs poubelle, pinces" aide="Sépare les objets par des virgules" />
+          ${erreur ? html`<p role="alert" className="rounded-xl bg-corail/10 px-3 py-2 text-sm text-corail-fonce">${erreur}</p>` : null}
+          <button type="submit" disabled=${envoi}
+            className="w-full rounded-xl bg-marine px-4 py-3 font-semibold text-white transition hover:bg-marine/90 disabled:opacity-60">
+            ${envoi ? 'Un instant…' : 'Publier la sortie'}
+          </button>
+        </form>
+        <p className="mt-4 text-center">
+          <button type="button" className="text-sm text-slate-500 underline" onClick=${props.onAnnuler}>Annuler</button>
+        </p>
+      </section>`;
+  }
+
   // ---------- onglets ----------
 
   function Icone(props) {
@@ -337,6 +458,7 @@
     var _s = useState(null), sorties = _s[0], setSorties = _s[1];
     var _m = useState(''), message = _m[0], setMessage = _m[1];
     var _d = useState(null), sortieOuverte = _d[0], setSortieOuverte = _d[1];
+    var estOrganisateur = !!utilisateur && (utilisateur.role === 'organisateur' || utilisateur.role === 'admin');
 
     function chargerSorties() {
       db.listerSortiesAVenir().then(setSorties);
@@ -386,6 +508,19 @@
       window.scrollTo(0, 0);
     }
 
+    function sortieCreee(sortie) {
+      chargerSorties();
+      ouvrirSortie(sortie.id);
+      setMessage('Ta sortie est publiée !');
+    }
+
+    function changerRole(role) {
+      db.changerRoleDemo(role).then(function (profil) {
+        setUtilisateur(profil);
+        setMessage('Tu es maintenant en mode ' + nomRole(role).toLowerCase() + ' (démo).');
+      });
+    }
+
     function reinitialiser() {
       db.reinitialiser().then(function () {
         setUtilisateur(null);
@@ -404,6 +539,8 @@
         onBasculer=${function () { setVue(vue === 'connexion' ? 'inscription' : 'connexion'); }}
         onAnnuler=${function () { setVue('accueil'); }}
       />`;
+    } else if (vue === 'creation' && estOrganisateur) {
+      contenu = html`<${FormulaireSortie} onCreee=${sortieCreee} onAnnuler=${retourAuxSorties} />`;
     } else if (vue === 'detail') {
       contenu = html`<${DetailSortie} key=${sortieOuverte} id=${sortieOuverte} onRetour=${retourAuxSorties} />`;
     } else if (onglet === 'sorties') {
@@ -411,11 +548,9 @@
         <div>
           ${utilisateur
             ? html`<section className="rounded-2xl bg-lagon/15 p-5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-lg font-bold text-marine">Bonjour ${utilisateur.prenom} 👋</p>
-                  <span className="rounded-full bg-marine px-2.5 py-0.5 text-xs font-semibold text-white">${nomRole(utilisateur.role)}</span>
-                </div>
+                <p className="text-lg font-bold text-marine">Bonjour ${utilisateur.prenom} 👋</p>
                 <p className="mt-1 text-sm text-slate-700">Voici les prochaines sorties de ramassage dans la rade.</p>
+                <${BasculeRole} role=${utilisateur.role} onChanger=${changerRole} />
               </section>`
             : html`<section className="rounded-2xl bg-marine p-6 text-white">
                 <p className="text-sm font-semibold uppercase tracking-wider text-lagon">Zéro déchets en rade de Brest</p>
@@ -425,7 +560,15 @@
                   Je crée mon compte
                 </button>
               </section>`}
-          <h2 className="mb-3 mt-6 text-lg font-bold text-marine">Prochaines sorties</h2>
+          <div className="mb-3 mt-6 flex items-center justify-between gap-3">
+            <h2 className="text-lg font-bold text-marine">Prochaines sorties</h2>
+            ${estOrganisateur
+              ? html`<button type="button" onClick=${function () { setVue('creation'); window.scrollTo(0, 0); }}
+                  className="flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-marine px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-marine/90">
+                  <${IconePlus} />Créer une sortie
+                </button>`
+              : null}
+          </div>
           <${ListeSorties} sorties=${sorties} onOuvrir=${ouvrirSortie} />
         </div>`;
     } else {

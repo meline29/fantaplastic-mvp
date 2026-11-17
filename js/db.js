@@ -12,6 +12,8 @@
   var EMAIL_OK = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
   // Rôles qu'on peut choisir soi-même en créant son compte (admin : jamais)
   var ROLES_INSCRIPTION = ['benevole', 'organisateur'];
+  // Rôles qui ont le droit de créer une sortie (US2)
+  var ROLES_ORGANISATION = ['organisateur', 'admin'];
 
   function creerDB(options) {
     var prefixe = (options && options.prefixe) || 'fantaplastic';
@@ -215,6 +217,58 @@
       return Object.assign(enrichir(s, d), { organisateur_prenom: orga ? orga.prenom : null });
     }
 
+    // ---------- US2 : un organisateur crée une sortie ----------
+
+    async function creerSortie(champs) {
+      champs = champs || {};
+      var moi = await utilisateurCourant();
+      if (!moi) throw new Error('Connecte-toi pour créer une sortie.');
+      if (ROLES_ORGANISATION.indexOf(moi.role) === -1) throw new Error('Seuls les organisateurs peuvent créer une sortie.');
+
+      var titre = String(champs.titre || '').trim();
+      var lieu = String(champs.lieu || '').trim();
+      var commune = String(champs.commune || '').trim();
+      var debut = champs.date_debut ? new Date(champs.date_debut) : null;
+      var dureeMin = Number(champs.duree_min);
+      var places = Number(champs.places);
+      var fourni = enListe(champs.materiel_fourni);
+      var apporter = enListe(champs.materiel_a_apporter);
+
+      if (!titre) throw new Error('Donne un titre à la sortie.');
+      if (titre.length > 80) throw new Error('Le titre doit faire 80 caractères maximum.');
+      if (!lieu) throw new Error('Indique le lieu de rendez-vous.');
+      if (!commune) throw new Error('Indique la commune.');
+      if (!debut || isNaN(debut.getTime())) throw new Error("Choisis la date et l'heure de la sortie.");
+      if (debut.getTime() <= Date.now()) throw new Error('La sortie doit avoir lieu dans le futur.');
+      if (!Number.isInteger(dureeMin) || dureeMin < 30 || dureeMin > 480) throw new Error('La durée doit être comprise entre 30 min et 8 h.');
+      if (!Number.isInteger(places) || places < 1 || places > 500) throw new Error('Le nombre de places doit être compris entre 1 et 500.');
+      if (fourni.length > 20 || apporter.length > 20) throw new Error('20 objets maximum par liste de matériel.');
+      if (fourni.concat(apporter).some(function (o) { return o.length > 60; })) throw new Error('Chaque objet doit faire 60 caractères maximum.');
+
+      var d = donnees();
+      var s = {
+        id: nouvelId(), titre: titre, lieu: lieu, commune: commune,
+        date_debut: debut.toISOString(), duree_min: dureeMin, places: places,
+        materiel_fourni: fourni, materiel_a_apporter: apporter,
+        lat: null, lng: null, statut: 'prevue', organisateur_id: moi.id, created_at: new Date().toISOString()
+      };
+      d.sorties.push(s);
+      sauver();
+      return obtenirSortie(s.id);
+    }
+
+    // Démo uniquement : passer de bénévole à organisateur sans recréer de compte, pour les revues.
+    // Avec Supabase, l'utilisateur ne pourra pas changer son rôle lui-même (voir schema.sql).
+    async function changerRoleDemo(role) {
+      if (ROLES_INSCRIPTION.indexOf(role) === -1) throw new Error('Choisis si tu es bénévole ou organisateur.');
+      var session = lire(CLE_SESSION);
+      var profil = session && donnees().profiles.find(function (p) { return p.id === session.profil_id; });
+      if (!profil) throw new Error("Connecte-toi d'abord.");
+      profil.role = role;
+      sauver();
+      return profilPublic(profil);
+    }
+
     // Remet les données de démo à zéro (pratique avant une revue de sprint)
     async function reinitialiser() {
       cache = null;
@@ -237,6 +291,8 @@
       utilisateurCourant: utilisateurCourant,
       listerSortiesAVenir: listerSortiesAVenir,
       obtenirSortie: obtenirSortie,
+      creerSortie: creerSortie,
+      changerRoleDemo: changerRoleDemo,
       reinitialiser: reinitialiser,
       _effacer: _effacer
     };
